@@ -1,8 +1,6 @@
-PROJECT_NAME	= Conjugate_gradient_benchmark
-MAJOR_VERSION	= 1
-MINOR_VERSION	= 0
-PATCH_VERSION	= 0
-BUILD_VERSION 	= 0
+PROJECT_NAME	= PaLinSo
+MAJOR_VERSION	= 0
+MINOR_VERSION	= 1
 
 #Path to shared directory, which contains some scripts
 SHARED_PATH	= shared
