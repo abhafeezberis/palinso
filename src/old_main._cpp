@@ -1,0 +1,1369 @@
+/* Copyright (C) 2012 by Mickeal Verschoor
+
+   Permission is hereby granted, free of charge, to any person
+   obtaining a copy of this software and associated documentation
+   files (the "Software"), to deal in the Software without
+   restriction, including without limitation the rights to use, copy,
+   modify, merge, publish, distribute, sublicense, and/or sell copies
+   of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+   
+   The above copyright notice and this permission notice shall be
+   included in all copies or substantial portions of the Software.
+   
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE. */
+
+#include "math/SpMatrix.hpp"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include "util/cuda_util.hpp"
+#include <math.h>
+#include <unistd.h>
+#include "core/version.hpp"
+#include "math/Vector.hpp"
+#include "math/ParallelSPMVCudaTask.hpp"
+#include "math/ParallelSPMVTask.hpp"
+#include "math/ParallelBICGSTABTask.hpp"
+#include "core/ThreadPool.hpp"
+#include "core/Timer.hpp"
+#include "core/Exception.hpp"
+#include "math/matrix_loaders.hpp"
+#include "util/CSVExporter.hpp"
+
+#include "cublas.h"
+
+#define NVIDIA_TEST
+
+using namespace CGF;
+
+const int n_matrices = 54;
+const int n_rest_matrices = 15;
+const int indices[] = {  1,  2,  3,  4,  6,  8,  9, 10, 13, 14, 15, 17, 18,
+			19, 20, 24, 25, 27, 28, 32, 33, 35, 36, 37, 38, 39, 
+			40, 41, 42, 44, 46, 47, 48, 49, 50, 51, 52, 56, 57, 
+			58, 59, 60, 62, 64, 65, 66, 67, 68, 69, 70, 74, 75, 
+			 76, 77, 
+			 //rest
+			 5, 12, 16, 21, 23, 31, 34, 45, 53, 54, 61, 
+			 63, 71,72, 73 };
+//Not converging: 0, 7, 11, 22, 26, 29, 30, 43, 55,  
+//26 duurt lang
+//29 out of memory for N=8 devices = 1, rest converges
+
+const uint test_matrix = 55;
+
+const char* matrices[] = {/*0*/"Andrews",
+			  /*1*/"jnlbrng1",
+			  /*2*/"parabolic_fem",
+			  /*3*/"Pres_Poisson",
+			  /*4*/"G2_circuit",
+			  /*5*/"G3_circuit", 
+			  /*6*/"Chem97ZtZ",
+			  /*7*/"BenElechi1",
+			  /*8*/"ted_B",
+			  /*9*/"ted_B_unscaled",
+			  /*10*/"bcsstk34",
+			  /*11*/"bcsstk36",
+			  /*12*/"bcsstk38",
+			  /*13*/"bcsstm39",
+			  /*14*/"crystm01",
+			  /*15*/"crystm02",
+			  /*16*/"ct20stif",
+			  /*17*/"msc00726",
+			  /*18*/"msc01050",
+			  /*19*/"msc01440",
+			  /*20*/"msc04515",
+			  /*21*/"msc10848",
+			  /*22*/"pwtk",
+			  /*23*/"tmt_sym",
+			  /*24*/"sts4098",
+			  /*25*/"qa8fm",
+			  /*26*/"ship_001",
+			  /*27*/"apache1",
+			  /*28*/"apache2",
+			  /*29*/"audikw_1",
+			  /*30*/"bmw7st_1",
+			  /*31*/"bmwcra_1",
+			  /*32*/"cvxbqp1",
+			  /*33*/"gridgena",
+			  /*34*/"inline_1",
+			  /*35*/"2cubes_sphere",
+			  /*36*/"Dubcova3",
+			  /*37*/"Dubcova2",
+			  /*38*/"Dubcova1",
+			  /*39*/"cbuckle",
+			  /*40*/"plbuckle",
+			  /*41*/"smt",
+			  /*42*/"olafu",
+			  /*43*/"raefsky4",
+			  /*44*/"thermal1",
+			  /*45*/"thermal2",
+			  /*46*/"af_shell3",
+			  /*47*/"cfd1",
+			  /*48*/"cfd2",
+			  /*49*/"bodyy4",
+			  /*50*/"bodyy5",
+			  /*51*/"bodyy6",
+			  /*52*/"mesh1e1",
+			  /*53*/"aft01",
+			  /*54*/"bone010",
+			  /*55*/"LFAT5000",
+			  /*56*/"fv1",
+			  /*57*/"nasa1824",
+			  /*58*/"nasa2146",
+			  /*59*/"nasa2910",
+			  /*60*/"nasa4704",
+			  /*61*/"nasasrb",
+			  /*62*/"nd12k",
+			  /*63*/"nd24k",
+			  /*64*/"nd3k",
+			  /*65*/"nd6k",
+			  /*66*/"finan512",
+			  /*67*/"ecology2",
+			  /*68*/"Kuu",
+			  /*69*/"Muu",
+			  /*70*/"bundle1",
+			  /*71*/"F1",
+			  /*72*/"Trefethen_150",
+			  /*73*/"Trefethen_20",
+			  /*74*/"Trefethen_200",
+			  /*75*/"Trefethen_2000",
+			  /*76*/"Trefethen_20000",
+			  /*77*/"Trefethen_20000b",
+			  /*78*/"dense2",
+			  /*79*/"pdb1HYS", /*Non symmetric*/
+			  /*80*/"consph",
+			  /*81*/"cant",
+			  /*82*/"pwtk",
+			  /*83*/"rma10",
+			  /*84*/"qcd5_4",
+			  /*85*/"shipsec1", /*Non symmetric*/
+			  /*86*/"mac_econ_fwd500",
+			  /*87*/"mc2depi",
+			  /*88*/"cop20k_A", /*Non symmetric*/
+			  /*89*/"scircuit",
+			  /*90*/"webbase-1M",
+			  /*91*/"rail4284",
+			  /*92*/"../misc/CYLSHELL/s1rmq4m1",
+			  /*93*/"../misc/CYLSHELL/s1rmt3m1",
+			  /*94*/"../misc/CYLSHELL/s2rmq4m1",
+			  /*95*/"../misc/CYLSHELL/s2rmt3m1",
+			  /*96*/"../misc/CYLSHELL/s3dkq4m2",
+			  /*97*/"../misc/CYLSHELL/s3dkt3m2",
+			  /*98*/"../misc/CYLSHELL/s3rmq4m1",
+			  /*99*/"../misc/CYLSHELL/s3rmt3m1",
+			  /*100*/"../misc/CYLSHELL/s3rmt3m3",
+			  /*101*/"../misc/HAMM/add20",
+			  /*102*/"../misc/HAMM/add32",
+			  /*103*/"../misc/HAMM/memplus",
+			  ///*104*/"../misc/QCD/conf5_0_00l4x4_1000",
+			  ///*105*/"../misc/QCD/conf5_4_00l8x8_0500",
+			  /*106*/"../NEP/AIRFOIL/af23560",
+			  /*107*/"../SPARSKIT/DRIVCAV/e05r0000",
+			  /*108*/"../SPARSKIT/DRIVCAV/e20r0000",
+			  /*109*/"../SPARSKIT/DRIVCAV/e30r0000",
+			  /*110*/"../SPARSKIT/DRIVCAV/e40r0000",
+			  /*111*/"../SPARSKIT/FIDAP/fidap001",
+			  /*112*/"../SPARSKIT/FIDAP/fidap002",
+			  /*113*/"../SPARSKIT/FIDAP/fidap003",
+			  /*114*/"../SPARSKIT/FIDAP/fidap004",
+			  /*115*/"../SPARSKIT/FIDAP/fidap005",
+			  /*116*/"../SPARSKIT/FIDAP/fidap006",
+			  /*117*/"../SPARSKIT/FIDAP/fidap007",
+			  /*118*/"../SPARSKIT/FIDAP/fidap008",
+			  /*119*/"../SPARSKIT/FIDAP/fidap009",
+			  /*120*/"../SPARSKIT/FIDAP/fidap010",
+			  /*121*/"../SPARSKIT/FIDAP/fidap011",
+			  /*122*/"../SPARSKIT/FIDAP/fidap012",
+			  /*123*/"../SPARSKIT/FIDAP/fidap013",
+			  /*124*/"../SPARSKIT/FIDAP/fidap014",
+			  /*125*/"../SPARSKIT/FIDAP/fidap015",
+			  /*126*/"../SPARSKIT/FIDAP/fidap018",
+			  /*127*/"../SPARSKIT/FIDAP/fidap019",
+			  /*128*/"../SPARSKIT/FIDAP/fidap020",
+			  /*129*/"../SPARSKIT/FIDAP/fidap021",
+			  /*130*/"../SPARSKIT/FIDAP/fidap022",
+			  /*131*/"../SPARSKIT/FIDAP/fidap023",
+			  /*132*/"../SPARSKIT/FIDAP/fidap024",
+			  /*133*/"../SPARSKIT/FIDAP/fidap025",
+			  /*134*/"../SPARSKIT/FIDAP/fidap026",
+			  /*135*/"../SPARSKIT/FIDAP/fidap027",
+			  /*136*/"../SPARSKIT/FIDAP/fidap028",
+			  /*137*/"../SPARSKIT/FIDAP/fidap029",
+			  /*138*/"../SPARSKIT/FIDAP/fidap031",
+			  /*139*/"../SPARSKIT/FIDAP/fidap032",
+			  /*140*/"../SPARSKIT/FIDAP/fidap033",
+			  /*141*/"../SPARSKIT/FIDAP/fidap035",
+			  /*142*/"../SPARSKIT/FIDAP/fidap036",
+			  /*143*/"../SPARSKIT/FIDAP/fidap037",
+			  /*144*/"../SPARSKIT/FIDAP/fidapm02",
+			  /*145*/"../SPARSKIT/FIDAP/fidapm03",
+			  /*146*/"../SPARSKIT/FIDAP/fidapm05",
+			  /*147*/"../SPARSKIT/FIDAP/fidapm07",
+			  /*148*/"../SPARSKIT/FIDAP/fidapm08",
+			  /*149*/"../SPARSKIT/FIDAP/fidapm09",
+			  /*150*/"../SPARSKIT/FIDAP/fidapm10",
+			  /*151*/"../SPARSKIT/FIDAP/fidapm11",
+			  /*152*/"../SPARSKIT/FIDAP/fidapm13",
+			  /*153*/"../SPARSKIT/FIDAP/fidapm15",
+			  /*154*/"../SPARSKIT/FIDAP/fidapm29",
+			  /*155*/"../SPARSKIT/FIDAP/fidapm33",
+			  /*156*/"../SPARSKIT/FIDAP/fidapm37",
+			  /*157*/"../SPARSKIT/FIDAP/fidapm37",
+			  /*158*/"../SPARSKIT/tokamak/utm300",
+			  /*159*/"../SPARSKIT/tokamak/utm1700a",
+			  /*160*/"../SPARSKIT/tokamak/utm1700b",
+			  /*161*/"../SPARSKIT/tokamak/utm3060",
+			  /*162*/"../SPARSKIT/tokamak/utm5940",
+};
+
+uint symmetric[] = { /*78*/ 0,
+		     /*79*/ 1,
+		     /*80*/ 1,
+		     /*81*/ 1,
+		     /*82*/ 1,
+		     /*83*/ 0,
+		     /*84*/ 0,
+		     /*85*/ 1,
+		     /*86*/ 0,
+		     /*87*/ 0,
+		     /*88*/ 1,
+		     /*89*/ 0,
+		     /*90*/ 0,
+		     /*91*/ 0,
+		     /*92*/ 1,
+		     /*93*/ 1,
+		     /*94*/ 1,
+		     /*95*/ 1,
+		     /*96*/ 1,
+		     /*97*/ 1,
+		     /*98*/ 1,
+		     /*99*/ 1,
+		     /*100*/ 1,
+		     /*101*/ 0,
+		     /*102*/ 0,
+		     /*103*/ 0,
+		     ///*104*/ 0,
+		     ///*105*/ 0,
+		     /*106*/ 0,
+		     /*107*/ 0,
+		     /*108*/ 0,
+		     /*109*/ 0,
+		     /*110*/ 0,
+		     /*111*/ 0,
+		     /*112*/ 0,
+		     /*113*/ 0,
+		     /*114*/ 0,
+		     /*115*/ 0,
+		     /*116*/ 0,
+		     /*117*/ 0,
+		     /*118*/ 0,
+		     /*119*/ 0,
+		     /*120*/ 0,
+		     /*121*/ 0,
+		     /*122*/ 0,
+		     /*123*/ 0,
+		     /*124*/ 0,
+		     /*125*/ 0,
+		     /*126*/ 0,
+		     /*127*/ 0,
+		     /*128*/ 0,
+		     /*129*/ 0,
+		     /*130*/ 0,
+		     /*131*/ 0,
+		     /*132*/ 0,
+		     /*133*/ 0,
+		     /*134*/ 0,
+		     /*135*/ 0,
+		     /*136*/ 0,
+		     /*137*/ 0,
+		     /*138*/ 0,
+		     /*139*/ 0,
+		     /*140*/ 0,
+		     /*141*/ 0,
+		     /*142*/ 0,
+		     /*143*/ 0,
+		     /*144*/ 0,
+		     /*145*/ 0,
+		     /*146*/ 0,
+		     /*147*/ 0,
+		     /*148*/ 0,
+		     /*149*/ 0,
+		     /*150*/ 0,
+		     /*151*/ 0,
+		     /*152*/ 0,
+		     /*153*/ 0,
+		     /*154*/ 0,
+		     /*155*/ 0,
+		     /*156*/ 0,
+		     /*157*/ 0,
+		     /*158*/ 0,
+		     /*159*/ 0,
+		     /*160*/ 0,
+		     /*161*/ 0,
+		     /*162*/ 0,
+		     
+};
+// ls -R -d -1 **/*/*.mtx
+//ls -R -d -1 ../shared/matrices/**/*/*.mtx > files.txt
+std::vector<std::string> matrixFiles;
+
+//SpMatrix<N>* mat;
+
+CSVExporter* exporter;
+CSVExporter* matrixAnalysis;
+
+template<int N, class T>
+SpMatrix<N, T>* load_matrix()
+{
+  FILE* file = fopen("../shared/matrices/sav_36975.mm", "r");
+  SpMatrix<N, T>* m = 0;
+  if(file){
+    //#define CHOP (36975 - 72)
+#define CHOP 0
+#define MUL 16
+
+    uint dim;
+    
+    fscanf(file, "%d\n", &dim);
+    
+    message("Dim = %d", dim);
+    
+    m = new SpMatrix<N, T>((dim-CHOP)*MUL, (dim-CHOP)*MUL);
+    //m = new SpMatrix((dim-CHOP), (dim-CHOP));
+    
+    while(!feof(file)){
+      uint x, y;
+      float val;
+      
+      fscanf(file, "%d, %d, %f\n", &x, &y, &val);
+      if(x<dim-CHOP && y<dim-CHOP){
+	//m->set(x, y, val);
+	for(uint i=0;i<MUL;i++)
+	  m->set(x + (dim - CHOP)*i, y + (dim - CHOP)*i, val);
+      }
+    }
+    
+    fclose(file);
+  }
+  m->alignRows();
+  m->reorderBlocks();
+  return m;
+}
+
+
+template<int N, class T>
+SpMatrix<N, T>* load_matrix_2()
+{
+  FILE* file = fopen("../shared/matrices/example_2.dat", "r");
+  SpMatrix<N, T>* m = 0;
+  if(file){
+    uint vdim;
+    uint mdim;
+    
+    fscanf(file, "%d\n", &vdim);
+    fscanf(file, "%d\n", &mdim);
+    
+    message("Dim = %d", vdim);
+
+    m = new SpMatrix<N, T>(vdim, vdim);
+
+    while(!feof(file)){
+      uint x, y;
+      float val;
+      char c;
+      fscanf(file, "%c %d %d %f\n", &c, &x, &y, &val);
+      
+      if(c == 'a'){
+	m->set(x, y, val);
+      }
+    }
+    fclose(file);
+  }
+  return m;
+}
+
+template<int N, class T>
+SpMatrix<N, T>* load_matrix_3()
+{
+  FILE* file = fopen("../shared/matrices/small_matrixrcm.txt", "r");
+  SpMatrix<N, T>* m = 0;
+  if(file){
+    uint vdim;
+
+    fscanf(file, "%d\n", &vdim);
+
+    message("Dim = %d", vdim);
+
+    m = new SpMatrix<N, T>(vdim, vdim);
+
+    while(!feof(file)){
+      float x, y;
+      float val;
+
+      fscanf(file, "%f %f %f\n", &x, &y, &val);
+      
+      m->set((int)x-1, (int)y-1, val);
+    }
+    fclose(file);
+  }
+  return m;
+}
+
+template<int N, class T>
+SpMatrix<N, T>* gen_poisson_matrix(uint dim){
+  SpMatrix<N, T>* m = new SpMatrix<N, T>(dim, dim);
+  for(uint i=0;i<dim;i++){
+    for(uint j=0;j<dim;j++){
+      if(i==j){
+	m->set(i,j,-2);
+	if(i-2 >=0 ){
+	  m->set(i-2,j, 1);
+	}
+
+	if(i+2 <dim ){
+	  m->set(i+2,j, 1);
+	}
+      }
+    }
+  }
+  return m;
+}
+
+template<int N, class T>
+SpMatrix<N, T>* gen_laplacian_matrix(uint dim, uint order, uint distance=1){
+  SpMatrix<N, T>* m = new SpMatrix<N, T>(dim, dim);
+
+  message("Generating laplacian matrix %dx%d with %d diagonals", dim, dim, 2*order+1);
+  message("Distance between diagonals = %d", distance);
+  
+  cgfassert(distance>=1);
+
+  for(uint i=0;i<dim;i++){
+    uint n_offdiag = 0;
+    for(uint j=0;j<order;j++){
+      uint index1 = i+(j+1)*distance;
+      uint index2 = i-(j+1)*distance;
+
+      if(index1 < dim && index1 >= 0 ){
+	n_offdiag++;
+	m->set(i,index1, -1);
+      }
+
+      if(index2 < dim && index2 >= 0 && index1 != index2){
+	n_offdiag++;
+	m->set(i,index2, -1);
+      }
+    }
+
+    if(n_offdiag == 0){
+      m->set(i,i,1);
+    }else{
+      m->set(i,i,n_offdiag);
+    }
+  }
+  return m;
+}
+
+template<int N, class T>
+void spmv_test(){
+  uint d = 504855;
+  uint e = 504855;
+  SpMatrix<N, T>* mat = new SpMatrix<N,T>(d, e);
+  Vector<T>* b = new Vector<T>(d); 
+  Vector<T>* x = new Vector<T>(e); 
+  for(uint i=0;i<d;i++){
+    for(uint j=0;j<e;j++){
+      if(i==j)
+	(*mat)[j][i] = 1;//T(i);//T(j);
+    }
+  }
+
+  for(uint i=0;i<d;i++){
+    (*b)[i] = 1;//T(i);
+  }
+
+  for(uint i=0;i<e;i++){
+    (*x)[i] = 1;//T(i);
+  }
+
+  Timer timer;
+    
+  Task* task = 0;
+
+  ThreadPool* tp = 0;
+  
+  tp = CGF::getThreadPool(1);
+  task = new ParallelSPMVCudaTask<N, T>(tp, x, mat, b);
+
+  tp->assignTask(task, Allocate);
+  tp->sync();
+  timer.start();
+  
+  tp->assignTask(task, SolveSystem);
+  tp->sync();
+  timer.stop();
+  
+  tp->assignTask(task, CopyResult);
+  tp->assignTask(task, Deallocate);
+  tp->sync();
+  
+  delete task;
+
+  //message("%f", (float) (d*d-d)/2);
+  std::cout << *x << std::endl;
+
+  delete x;
+  delete b;
+  delete mat;
+}
+
+template<int N, class T>
+void large_spmv_test_2(uint i, uint nvtest){
+  message("Blocksize = %d", N);
+  char filename[255];
+
+  uint threads, devices;
+
+  if(nvtest){
+    //sprintf(filename, "../shared/matrices/mtx/%s.mtx", matrices[i]);
+    sprintf(filename, "%s", matrixFiles[i].c_str());
+  }else{
+    sprintf(filename, "../shared/matrices/ufl/%s/%s.mtx", matrices[i], 
+	    matrices[i]);
+  }
+ 
+  //sprintf(filename, "../shared/matrices/nv/nv/rail4284.mtx");
+ 
+  message("%s", filename);
+  SpMatrix<N, T>* mat = 0;
+#if 1
+  if(nvtest){
+    mat = load_matrix_market_exchange<N, T>(filename);
+  }else{
+    mat = load_matrix_market_exchange<N, T>(filename);
+  }
+
+  if(mat == 0){
+    warning("Failed loading %s", filename);
+    return;
+  }
+
+#if 0
+  SpMatrix<N, T>* reordered = mat->reorderKing();
+
+  delete mat;
+  mat = reordered;
+  mat->analyse();
+  mat->finalize();
+  /*Reordering using RCM / King / MD does not improve fill rate of the blocks*/
+#endif
+
+#if 0
+  matrixAnalysis->setValue("matrix_name", matrices[i]);
+  
+  mat->analyseDivision(matrixAnalysis, 0);
+  mat->analyseDivision(matrixAnalysis, 0.5);
+  mat->analyseDivision(matrixAnalysis, 0.6);
+  mat->analyseDivision(matrixAnalysis, 0.7);
+  mat->analyseDivision(matrixAnalysis, 0.8);
+  mat->analyseDivision(matrixAnalysis, 0.9);
+  mat->analyseDivision(matrixAnalysis, 1);
+#endif
+  mat->finalize();
+#else
+  delete mat;
+
+#define TD 1234
+  mat = new SpMatrix<N, T>(TD, TD);
+  for(uint y=0;y<TD;y++){
+    for(uint x=0;x<TD;x++){
+      (*mat)[y][x] = y;
+    }
+  }
+  mat->finalize();
+#endif  
+  if(mat){
+    Vector<T> b(MAX(mat->getWidth(), mat->getHeight()));
+    Vector<T> x(MAX(mat->getHeight(), mat->getWidth()));
+    //Vector<T> b2(mat->getWidth());
+    
+    exporter->setValue("problem", filename);
+    exporter->setValue("dim", mat->getWidth());
+    exporter->setValue("dimy", mat->getHeight());
+    exporter->setValue("elements", mat->getNElements());
+    exporter->setValue("shortest_row", mat->getShortestRow());
+    exporter->setValue("longest_row", mat->getLongestRow());
+    exporter->setValue("average_row", mat->getAverageRow());
+    exporter->setValue("bandwidth", mat->getBandwidth());
+    exporter->setValue("total_blocks", mat->getNBlocks());
+    exporter->setValue("block_size", N);
+    exporter->setValue("average_block_fill", mat->getAverageBlockFill());
+    
+    for(uint i=0;i<MAX(mat->getHeight(), mat->getWidth());i++){
+      if(i%2==0){
+	x[i] = 1;
+	b[i] = 1;
+      }else{
+	x[i] = -1;
+	b[i] = -1;
+      }
+    }
+    
+    //mat->analyse();
+    
+    Timer timer;
+    
+    Task* task = 0;
+
+    ThreadPool* tp = 0;
+
+    for(uint i=0;i<6;i++){
+      threads = devices = 0;
+      switch(i){
+#if 0
+      case 0:
+	threads = 1;
+	devices = 0;
+	break;
+      case 1:
+	threads = 2;
+	devices = 0;
+	break;
+#endif
+#if 0
+      case 2:
+	threads = 4;
+	devices = 0;
+	break;
+#endif
+#if 0
+      case 3:
+	threads = 8;
+	devices = 0;
+	break;
+#endif
+      case 4:
+	threads = 0;
+	devices = 1;
+	break;
+#if 0
+      case 5:
+	threads = 0;
+	devices = 2;
+	break;
+#endif
+      default:
+	threads = devices = 0;
+	continue;
+      }
+
+      if(threads == 0 && devices == 0)
+	continue;
+
+      if(threads != 0){
+	message("CPU test with %d threads", threads);
+	tp = CGF::getThreadPool(threads);
+	task =
+	  new ParallelSPMVTask<N, T>(tp, mat, &b, &x);
+      }else if(devices != 0){
+	message("GPU test with %d devices", devices);
+	tp = CGF::getThreadPool(devices);
+	task =
+	  new ParallelSPMVCudaTask<N, T>(tp, &x, mat, &b);
+      }else{
+	warning("Zero threads and zero devices");
+      }
+
+      task->setCSVExporter(exporter);
+
+      exporter->setValue("n_threads", threads);
+      exporter->setValue("n_devices", devices);
+      
+      tp->assignTask(task, Allocate);
+      tp->sync();
+      timer.start();
+      
+      tp->assignTask(task, SolveSystem);
+      tp->sync();
+      timer.stop();
+      
+      tp->assignTask(task, CopyResult);
+      tp->assignTask(task, Deallocate);
+      tp->sync();
+
+      message("%d usec elapsed", timer.getTimeUSec());
+      
+      exporter->setValue("total_time", timer.getTimeUSec());
+      
+      task->exportSummary();
+      delete task;
+    }
+    delete mat;
+  }else{
+    warning("File %s not found. Test skipped.", filename);
+  }
+}
+
+template<int N, class T>
+void large_spmv_test_3(uint i){
+  message("Blocksize = %d", N);
+  
+  char buffer[255];
+  sprintf(buffer, "Laplacian_%d_%d", 27, 4);
+
+  SpMatrix<N, T>* mat = gen_laplacian_matrix<N, T>(pow(2,i)*1000, 13, 4);
+  mat->setCSVExporter(exporter);
+  mat->finalize();
+
+  Vector<T> b(mat->getWidth());
+  Vector<T> x(mat->getWidth());
+  Vector<T> b2(mat->getWidth());
+
+  exporter->setValue("problem", buffer);
+  exporter->setValue("dim", mat->getWidth());
+  exporter->setValue("elements", mat->getNElements());
+  exporter->setValue("shortest_row", mat->getShortestRow());
+  exporter->setValue("longest_row", mat->getLongestRow());
+  exporter->setValue("average_row", mat->getAverageRow());
+  exporter->setValue("bandwidth", mat->getBandwidth());
+  exporter->setValue("total_blocks", mat->getNBlocks());
+  exporter->setValue("block_size", N);
+  exporter->setValue("average_block_fill", mat->getAverageBlockFill());
+  
+  for(uint i=0;i<mat->getWidth();i++){
+    if(i%2==0)
+      x[i] =  1;
+    else
+      x[i] =  1;
+  }
+
+  Timer timer;
+  ThreadPool* pool = 0;
+  Task* task = 0;
+  uint threads, devices;
+
+  for(uint i=0;i<6;i++){
+    switch(i){
+#if 1
+      case 0:
+	threads = 1;
+	devices = 0;
+	break;
+      case 1:
+	threads = 2;
+	devices = 0;
+	break;
+      case 2:
+	threads = 4;
+	devices = 0;
+	break;
+      case 3:
+	threads = 8;
+	devices = 0;
+	break;
+#endif
+      case 4:
+	threads = 0;
+	devices = 1;
+	break;
+      case 5:
+	threads = 0;
+	devices = 2;
+	break;   
+    default:
+      threads = devices = 0;
+    }
+
+    if(threads != 0){
+      message("CPU test with %d threads", threads);
+      pool = CGF::getThreadPool(threads);
+      task =
+	new ParallelSPMVTask<N, T>(pool->getSize(), mat, &b, &x);
+    }else if(devices != 0){
+      message("GPU test with %d devices", devices);
+      pool = CGF::getThreadPool(threads);
+      task =
+	new ParallelSPMVCudaTask<N, T>(pool->getSize(), &b, mat, &x);
+    }
+    task->setCSVExporter(exporter);
+
+    exporter->setValue("n_devices", devices);
+    exporter->setValue("n_threads", threads);
+  
+    pool->assignTask(task, Allocate);
+    pool->sync();
+    timer.start();
+
+    pool->assignTask(task, SolveSystem);
+
+    pool->sync();
+    timer.stop();
+
+    pool->assignTask(task, CopyResult);
+    pool->assignTask(task, Deallocate);
+  
+    pool->sync();
+
+    exporter->setValue("total_time", timer.getTimeUSec());
+  
+    //  exporter->saveRow();
+    task->exportSummary();
+
+    delete task;
+  }
+  delete mat;
+}
+
+template<int N, class T>
+void large_cg_test(uint i){
+  message("Blocksize = %d", N);
+  char filename[255];
+
+  sprintf(filename, "%s", matrixFiles[i].c_str());
+
+  SpMatrix<N, T>* mat = 0;
+
+#if 1
+  /*Load a matrix from file*/
+  mat = load_matrix_market_exchange<N, T>(filename);
+  if(mat == 0){
+    warning("Failed loading %s", filename);
+    return;
+  }
+  message("average_block_fill = %f", mat->getAverageBlockFill());
+#else
+  /*Construct your own*/
+  mat = new SpMatrix<N, T>(TD, TD);
+  for(uint y=0;y<TD;y++){
+    for(uint x=0;x<TD;x++){
+      (*mat)[y][x] = y*TD+x+1;
+    }
+  }
+#endif
+  
+  if(mat){
+    Vector<T> vec(mat->getWidth());
+    for(uint j=0;j<mat->getWidth();j++){
+      if(j%2==0)
+	vec[j] = 1;
+      else
+	vec[j] = 1;
+    }
+    mat->setCSVExporter(exporter);
+
+    /*Save some statistics to an CSV file*/
+    exporter->setValue("problem", filename);
+    exporter->setValue("dim", mat->getWidth());
+    exporter->setValue("elements", mat->getNElements());
+    exporter->setValue("shortest_row", mat->getShortestRow());
+    exporter->setValue("longest_row", mat->getLongestRow());
+    exporter->setValue("average_row", mat->getAverageRow());
+    exporter->setValue("bandwidth", mat->getBandwidth());
+    exporter->setValue("total_blocks", mat->getNBlocks());
+    exporter->setValue("block_size", N);
+    exporter->setValue("average_block_fill", mat->getAverageBlockFill());
+
+    mat->finalize();
+
+    Timer timer;
+    Vector<T>* result;
+
+    /*Enable the tests you like to perform.*/
+#if 0
+    message("Single threaded test");
+    exporter->setValue("n_threads", 1);
+    exporter->setValue("n_devices", 0);
+    //result = mat->solveSystemCG(&vec);
+    /*BICGSTAB should also work in parallel, unfortunately not yet on
+      the GPU. Will be available soon.*/
+    //result = mat->solveSystemBICGSTABParallel(&vec, CGF::getThreadPool(1));
+    result = mat->solveSystemCGParallel(&vec, CGF::getThreadPool(1));
+    delete result;
+#endif
+#if 0
+    message("Dual threaded test");
+    exporter->setValue("n_threads", 2);
+    exporter->setValue("n_devices", 0);
+    result = mat->solveSystemCGParallel(&vec, CGF::getThreadPool(2));
+    delete result;
+#endif
+#if 0    
+    message("Quad threaded test");
+    exporter->setValue("n_threads", 4);
+    exporter->setValue("n_devices", 0);
+    result = mat->solveSystemCGParallel(&vec, CGF::getThreadPool(4));
+    delete result;
+#endif
+#if 0
+    message("Oct threaded test");
+    exporter->setValue("n_threads", 8);
+    exporter->setValue("n_devices", 0);
+    result = mat->solveSystemCGParallel(&vec, CGF::getThreadPool(8));
+    delete result;
+#endif
+#if 1
+    message("Single cuda test");
+    exporter->setValue("n_threads", 0);
+    exporter->setValue("n_devices", 1);
+    result = mat->solveSystemCGCuda(&vec, CGF::getThreadPool(1));
+    delete result;
+#endif
+#if 0
+    message("Dual cuda test");
+    exporter->setValue("n_threads", 0);
+    exporter->setValue("n_devices", 2);
+    result = mat->solveSystemCGCuda(&vec, CGF::getThreadPool(2));
+    delete result;
+#endif
+    
+    delete mat;
+  }else{
+    warning("File %s not found. Test skipped.", filename);
+  }
+}
+
+template<int N, class T>
+void large_spmv_test_4(uint size){
+  message("Blocksize = %d, matrixsize = %d, %d", N, size);
+
+  uint threads, devices;
+
+  SpMatrix<N, T>* mat = new SpMatrix<N, T>(size, size);
+
+  for(uint i=0;i<size;i++){
+    for(uint j=0;j<size;j++){
+      mat->set(i, j, 1);
+    }
+  }
+
+  mat->finalize();
+
+  if(mat){
+    Vector<T> b(mat->getWidth());
+    Vector<T> x(mat->getWidth());
+    Vector<T> b2(mat->getWidth());
+    
+    char problemName[255];
+    sprintf(problemName, "Dense%d", size);
+    
+    exporter->setValue("problem", problemName);
+    exporter->setValue("dim", mat->getWidth());
+    exporter->setValue("elements", mat->getNElements());
+    exporter->setValue("shortest_row", mat->getShortestRow());
+    exporter->setValue("longest_row", mat->getLongestRow());
+    exporter->setValue("average_row", mat->getAverageRow());
+    exporter->setValue("bandwidth", mat->getBandwidth());
+    exporter->setValue("total_blocks", mat->getNBlocks());
+    exporter->setValue("block_size", N);
+    exporter->setValue("average_block_fill", mat->getAverageBlockFill());
+    
+    for(uint i=0;i<mat->getWidth();i++){
+      if(i%2==0){
+	x[i] = 1;
+	b[i] = 1;
+      }else{
+	x[i] = -1;
+	b[i] = -1;
+      }
+    }
+    
+    Timer timer;
+    
+    Task* task = 0;
+
+    ThreadPool* tp = 0;
+
+    for(uint i=0;i<6;i++){
+      threads = devices = 0;
+      switch(i){
+#if 0
+      case 0:
+	threads = 1;
+	devices = 0;
+	break;
+      case 1:
+	threads = 2;
+	devices = 0;
+	break;
+      case 2:
+	threads = 4;
+	devices = 0;
+	break;
+      case 3:
+	threads = 8;
+	devices = 0;
+	break;
+#endif
+      case 4:
+	threads = 0;
+	devices = 1;
+	break;
+#if 0
+      case 5:
+	threads = 0;
+	devices = 2;
+	break;
+#endif
+      default:
+	threads = devices = 0;
+	continue;
+      }
+
+      if(threads == 0 && devices == 0)
+	continue;
+
+      if(threads != 0){
+	message("CPU test with %d threads", threads);
+	tp = CGF::getThreadPool(threads);
+	task =
+	  new ParallelSPMVTask<N, T>(tp, mat, &b, &x);
+      }else if(devices != 0){
+	message("GPU test with %d devices", devices);
+	tp = CGF::getThreadPool(devices);
+	task =
+	  new ParallelSPMVCudaTask<N, T>(tp, &b, mat, &x);
+      }else{
+	warning("Zero threads and zero devices");
+      }
+
+      task->setCSVExporter(exporter);
+
+      exporter->setValue("n_threads", threads);
+      exporter->setValue("n_devices", devices);
+      
+      tp->assignTask(task, Allocate);
+      tp->sync();
+      timer.start();
+      
+      tp->assignTask(task, SolveSystem);
+      tp->sync();
+      timer.stop();
+      
+      tp->assignTask(task, CopyResult);
+      tp->assignTask(task, Deallocate);
+      tp->sync();
+
+      message("%d usec elapsed", timer.getTimeUSec());
+      
+      exporter->setValue("total_time", timer.getTimeUSec());
+      
+      task->exportSummary();
+      delete task;
+    }
+    delete mat;
+  }else{
+    warning("Matrix not created");
+  }
+}
+
+#define CHECK_CUBLAS(x) do{					\
+    cublasStatus s = x;						\
+    if(s != CUBLAS_STATUS_SUCCESS){				\
+      error("CUBLAS error in %s:%d", __FILE__, __LINE__);	\
+    }								\
+  }while(0)		
+	
+
+#define LOOP 100
+/*Benchmark of CUBLAS SGMV operation for increasing matrix sizes.*/		
+void dense_cublas_benchmark(){
+  float* h_A;
+  float* h_x;
+  float* h_y;
+  float* d_A;
+  float* d_x;
+  float* d_y;
+
+  char filename[255];
+  sprintf(filename, "cublas_dense.csv");
+  
+  FILE* file = fopen(filename, "w");
+  CSVExporter* exp = new CSVExporter(file);
+  exp->addColumn("size");
+  exp->addColumn("time");
+  exp->addColumn("gflops");
+  exp->saveHeader();
+
+  CHECK_CUBLAS(cublasInit());
+
+  uint size = 16;
+  
+  for(uint step = 0;step<1000;step++){
+    size += 16;
+
+    h_A = new float[size*size];
+    h_x = new float[size];
+    h_y = new float[size];
+    
+    /*Load matrices*/
+    for(uint i=0;i<size;i++){
+      for(uint j=0;j<size;j++){
+	h_A[size * i + j] = 1;
+      }
+      h_x[i] = 1;
+      h_y[i] = 1;
+    }
+    
+    CHECK_CUBLAS(cublasAlloc(size*size, sizeof(float), (void**)&d_A));
+    CHECK_CUBLAS(cublasAlloc(size,      sizeof(float), (void**)&d_x));
+    CHECK_CUBLAS(cublasAlloc(size,      sizeof(float), (void**)&d_y));
+    
+    CHECK_CUBLAS(cublasSetMatrix(size, size, sizeof(float), h_A, size, d_A, size));  
+    CHECK_CUBLAS(cublasSetVector(size,       sizeof(float), h_x, 1, d_x, 1));
+    CHECK_CUBLAS(cublasSetVector(size,       sizeof(float), h_y, 1, d_y, 1));
+    Timer t;
+    t.start();
+    
+    cudaThreadSynchronize();
+    for(uint i=0;i<LOOP;i++){
+      cublasSgemv('N', size, size, 1, d_A, size, d_x, 1, 1, d_y, 1);
+    }
+    cudaThreadSynchronize();
+    t.stop();
+
+    CHECK_CUBLAS(cublasFree(d_A));
+    CHECK_CUBLAS(cublasFree(d_x));
+    CHECK_CUBLAS(cublasFree(d_y));
+
+    float time = t.getTimeUSecF();
+    float flops = size*size*2;
+    time/=LOOP;
+    exp->setValue("size", size);
+    exp->setValue("time", time);
+    exp->setValue("gflops", (flops/1000)/time);
+    exp->saveRow();
+
+    message("size = %d, %f GFlops, time = %f", size, (flops/1000)/(time), time);
+
+    delete[] h_A; 
+    delete[] h_x; 
+    delete[] h_y; 
+  }
+
+  CHECK_CUBLAS(cublasShutdown());
+  fclose(file);
+}
+
+int main(int argc, char** argv){
+  try{
+    CGF::init(0);
+    version_print();
+    
+    //dense_cublas_benchmark();
+    //return 0;
+
+    char filename[255];
+    sprintf(filename, "%d.out.csv", getpid());
+
+    FILE* file = fopen(filename, "w");
+
+    sprintf(filename, "mat.%d.out.csv", getpid());
+    
+    /*Adapt such that all your *.mtx files are listed. Currently it
+      searches for patterns like
+      ./shared/matrices/bib1/case1/case1.mtx */
+
+    system("ls -R -d -1 ./shared/matrices/**/*/*.mtx > files.txt");
+    
+    std::ifstream fileList("files.txt", std::ios::in);
+    if(fileList.is_open()){
+      std::string line;
+      if(fileList.is_open()){
+	while(getline(fileList,line)){
+	  matrixFiles.push_back(line);
+	}
+      }
+    }
+    fileList.close();
+#if 1
+#if 1
+    exporter = new CSVExporter(file);
+    exporter->addColumn("problem");
+    exporter->addColumn("dim");
+    exporter->addColumn("elements");
+    exporter->addColumn("shortest_row");
+    exporter->addColumn("longest_row");
+    exporter->addColumn("average_row");
+    exporter->addColumn("bandwidth");
+    exporter->addColumn("total_blocks");
+    exporter->addColumn("block_size");
+    exporter->addColumn("average_block_fill");
+    exporter->addColumn("n_threads");
+    exporter->addColumn("n_devices");
+    exporter->addColumn("thread_id");
+    exporter->addColumn("blocks_per_thread");
+    exporter->addColumn("partial_dim");
+    // exporter->addColumn("partial_time");
+    exporter->addColumn("total_time");
+#if 0
+    exporter->addColumn("cg_1");
+    exporter->addColumn("cg_1_calls");
+    exporter->addColumn("cg_1_avg");
+    exporter->addColumn("cg_2");
+    exporter->addColumn("cg_2_calls");
+    exporter->addColumn("cg_2_avg");
+    exporter->addColumn("cg_3");
+    exporter->addColumn("cg_3_calls");
+    exporter->addColumn("cg_3_avg");
+    exporter->addColumn("cg_4");
+    exporter->addColumn("cg_4_calls");
+    exporter->addColumn("cg_4_avg");
+    exporter->addColumn("cg_5");
+    exporter->addColumn("cg_5_calls");
+    exporter->addColumn("cg_5_avg");
+    exporter->addColumn("device_copy");
+    exporter->addColumn("device_copy_calls");
+    exporter->addColumn("device_copy_avg");
+    exporter->addColumn("reduction");
+    exporter->addColumn("reduction_calls");
+    exporter->addColumn("reduction_avg");
+    exporter->addColumn("spmv");
+    exporter->addColumn("spmv_calls");
+    exporter->addColumn("spmv_avg");
+    exporter->addColumn("thread_sync");
+    exporter->addColumn("thread_sync_calls");
+    exporter->addColumn("thread_sync_avg");
+#endif
+    exporter->addColumn("n_iterations");
+    /*Conjugate Gradient benchmark routine*/
+    //for(int i=0;i<n_matrices+n_rest_matrices;i++){
+    //for(int i=0;i<n_matrices;i++){
+    for(uint i=0;i<matrixFiles.size();i++){
+      message("Matrix = %s", matrixFiles[i].c_str());
+      large_cg_test<1, float>(i);
+      large_cg_test<2, float>(i);
+      large_cg_test<4, float>(i);
+      large_cg_test<8, float>(i);
+    }
+
+#if 0 /*Enable for double-precision */
+    for(uint i=0;i<matrixFiles.size();i++){
+      message("Matrix = %s", matrixFiles[i].c_str());
+      large_cg_test<1, double>(i);
+      large_cg_test<2, double>(i);
+      large_cg_test<4, double>(i);
+      large_cg_test<8, double>(i);
+    }
+#endif
+    
+    delete exporter;
+    return 0;
+    
+    /*SPMV benchmark routine*/
+    //78->92
+#endif
+#endif
+
+#if 1
+    exporter = new CSVExporter(file);
+    exporter->addColumn("problem");
+    exporter->addColumn("dim");
+    exporter->addColumn("dimy");
+    exporter->addColumn("elements");
+    exporter->addColumn("shortest_row");
+    exporter->addColumn("longest_row");
+    exporter->addColumn("average_row");
+    exporter->addColumn("bandwidth");
+    exporter->addColumn("total_blocks");
+    exporter->addColumn("block_size");
+    exporter->addColumn("average_block_fill");
+    exporter->addColumn("n_threads");
+    exporter->addColumn("n_devices");    
+    exporter->addColumn("thread_id");
+    exporter->addColumn("blocks_per_thread");
+    exporter->addColumn("partial_dim");
+    exporter->addColumn("average_time");
+    exporter->addColumn("total_time");
+    exporter->addColumn("n_iterations");
+#if 1//78
+    
+    message("Test");
+    //for(int i=0;i<n_matrices + n_rest_matrices;i++){
+    for(uint i=0;i<matrixFiles.size();i++){
+      message("Test = %d", i);
+      int idx = i;//indices[i];
+      message("index = %d", idx);
+      large_spmv_test_2<1, float>(idx, 1);
+      large_spmv_test_2<2, float>(idx, 1);
+      large_spmv_test_2<4, float>(idx, 1);
+      large_spmv_test_2<8, float>(idx, 1);
+      //large_spmv_test_2<16, float>(i, 1);
+    }
+
+    //exit(0);
+#else
+#if 0
+#if 0
+    for(int i=0;i<n_matrices;i++){
+      large_spmv_test_2<1, float>(indices[i], 0);
+      large_spmv_test_2<2, float>(indices[i], 0);
+      large_spmv_test_2<4, float>(indices[i], 0);
+      large_spmv_test_2<8, float>(indices[i], 0);
+      //large_spmv_test_2<16, float>(indices[i], 0);
+    }
+#else
+    uint size = 16;
+    for(int i=0;i<10000;i++){
+      large_spmv_test_4<1, float>(size);
+      large_spmv_test_4<2, float>(size);
+      large_spmv_test_4<4, float>(size);
+      large_spmv_test_4<8, float>(size);
+      size += 16;
+    }
+#endif
+    exit(0);
+#endif
+#endif
+    delete exporter;
+#endif
+    /*Laplacian test*/
+#if 0
+    message("test 3");
+    
+    exporter = new CSVExporter(file);
+    exporter->addColumn("problem");
+    exporter->addColumn("dim");
+    exporter->addColumn("elements");
+    exporter->addColumn("shortest_row");
+    exporter->addColumn("longest_row");
+    exporter->addColumn("average_row");
+    exporter->addColumn("bandwidth");
+    exporter->addColumn("total_blocks");
+    exporter->addColumn("block_size");
+    exporter->addColumn("average_block_fill");
+    exporter->addColumn("n_threads");
+    exporter->addColumn("n_devices");    
+    exporter->addColumn("thread_id");
+    exporter->addColumn("blocks_per_thread");
+    exporter->addColumn("average_time");
+    exporter->addColumn("total_time");
+    
+    for(int i=0;i<n_matrices;i++){
+      large_spmv_test_3<1, float>(i);
+      large_spmv_test_3<2, float>(i);
+      large_spmv_test_3<4, float>(i);
+      large_spmv_test_3<8, float>(i);
+      //large_spmv_test_3<16, float>(i);
+      sz += 16;
+    }
+        
+    delete exporter;
+#endif
+    fclose(file);
+    
+    CGF::destroy();
+  }catch(Exception& e){
+    std::cerr << e.getError();
+  }
+  return 0;
+}
+
