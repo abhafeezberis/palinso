@@ -423,4 +423,4 @@ else{
   template class CUDASPMV<2, double, 512>;
   template class CUDASPMV<4, double, 512>;
   template class CUDASPMV<8, double, 512>;
-};
+}

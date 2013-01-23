@@ -112,4 +112,4 @@ namespace CGF{
     return stream.str();
   }
 
-};
+}

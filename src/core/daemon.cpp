@@ -47,11 +47,11 @@ namespace CGF{
 
     daemon_process = 1;
     return 1;
-  };
+  }
 
   int is_daemon(){
     return daemon_process;
-  };
+  }
 
   void redirect_std_file_descriptors(){
     /*Redirect stdout*/
@@ -64,4 +64,4 @@ namespace CGF{
     freopen(buffer, "w", stderr);
   }
 
-};
+}

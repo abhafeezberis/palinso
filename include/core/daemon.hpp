@@ -31,6 +31,6 @@ namespace CGF{
 
   void redirect_std_file_descriptors();
 
-};
+}
 
 #endif/*DAEMON_HPP*/

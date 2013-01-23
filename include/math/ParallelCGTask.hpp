@@ -49,6 +49,15 @@ namespace CGF{
     virtual void setMatrix(SpMatrix<N, T>* m);
     void computePreconditioner();
     void computeDistribution();
+
+    void setTolerance(T tol){
+      tolerance = tol;
+    }
+
+    void setMaxIterations(uint steps){
+      maxIterations = steps;
+    }
+
   protected:
     Vector<T>* r;
     const SpMatrix<N, T>* mat;
@@ -78,7 +87,10 @@ namespace CGF{
     uint* n_blocks;
     BenchmarkTimer* timers;
     uint* k;
+
+    T tolerance;
+    uint maxIterations;
   };
-};
+}
 
 #endif/*PARALLELCGTASK_HPP*/

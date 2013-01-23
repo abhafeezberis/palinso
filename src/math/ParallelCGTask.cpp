@@ -25,14 +25,12 @@
 
 namespace CGF{
 
-#define TOL 1e-8
-
   template<int N, class T>
   ParallelCGTask<N, T>::ParallelCGTask(const uint _n, 
 				       Vector<T>* const _x, 
 				       const SpMatrix<N, T>* const _mat, 
 				       const Vector<T>* const _b) : 
-    Task(_n),mat(_mat),x(_x), b(_b){
+    Task(_n),mat(_mat),x(_x), b(_b), tolerance(1e-6), maxIterations(100000){
     /*Allocate shared resources*/
 
     r = new Vector<T>(mat->getHeight());
@@ -147,7 +145,7 @@ namespace CGF{
 
     k[TID] = 0;
 
-    while(k[TID]<mat->getHeight()*10000){
+    while(k[TID]<maxIterations){
     //while(k[TID] < 103){
       /*Compute |V| */
       Vector<T>::mulp(*scratch1, *v, *v, vRange[TID]);
@@ -160,7 +158,7 @@ namespace CGF{
       }
 
       //lresidual = sqrt(lresidual);
-      if(sqrt(fabs(lresidual))<TOL){
+      if(sqrt(fabs(lresidual))<tolerance){
 	if(TID == 0){
 	  message("Succesfull in %d iterations, %10.10e, %10.10e", k[TID],
 		  lresidual, sqrt(fabs(lresidual)));
@@ -213,7 +211,7 @@ namespace CGF{
       lalpha = lbeta;
 
 #if 1
-      if(lbeta < TOL){
+      if(lbeta < tolerance){
 #if 1
 	Vector<T>::mulp(*scratch1, *r, *r, vRange[TID]);
 	reductions2[TID] = scratch1->sump(vRange[TID]);
@@ -225,7 +223,7 @@ namespace CGF{
 	}
 
 	//rl = sqrt(rl);
-	if(rl< TOL){
+	if(rl< tolerance){
 #endif
 	  if(TID == 0){
 	    message("Succesfull in %d iterations, %10.10e, %10.10e", k[TID],

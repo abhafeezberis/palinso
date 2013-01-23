@@ -20,7 +20,7 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. */
 
-#ifndef NO_CUDA
+#ifdef CUDA
 #include "math/CVector.hpp"
 #include "math/Vector.hpp"
 #include "core/Exception.hpp"
@@ -436,5 +436,5 @@ namespace CGF{
 
   template class CVector<float>;
   template class CVector<double>;
-};
-#endif/*NO_CUDA*/
+}
+#endif/*CUDA*/

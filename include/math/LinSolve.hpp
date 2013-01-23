@@ -98,7 +98,7 @@ namespace CGF{
 
     virtual void preSolve() = 0;
 
-    virtual void solve(uint steps = 10000) = 0;
+    virtual void solve(uint steps = 100000, T tolerance = 1E-6) = 0;
     
   protected:
     uint dim;
@@ -110,6 +110,6 @@ namespace CGF{
     bool externalAllocatedb;
     bool externalAllocatedx;
   };
-};
+}
 
 #endif/*LINSOLVE*/

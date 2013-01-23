@@ -78,10 +78,12 @@ namespace CGF{
     }
 
     void setCuda()const{
+#ifdef CUDA
       if(cudaAssigned == false){
 	init_cuda_thread(id);
 	cudaAssigned = true;
       }
+#endif
     }
     
   protected:
@@ -99,6 +101,6 @@ namespace CGF{
 
     mutable bool cudaAssigned;
   };
-};
+}
 
 #endif/*THREAD_HPP*/

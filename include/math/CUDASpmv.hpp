@@ -22,7 +22,7 @@
 
 #ifndef CUDASPMV_HPP
 #define CUDASPMV_HPP
-
+#ifdef CUDA
 namespace CGF{
   enum TextureOperation{TexNone = 0, TexVector, TexVectorAndIndices};
 
@@ -37,6 +37,6 @@ namespace CGF{
 			     const T* d_b, T* d_x, uint dim, 
 			     uint n_blocks, TextureOperation tex_op);
   };
-};
-
+}
+#endif/*CUDA*/
 #endif/*CUDASPMV_HPP*/

@@ -402,6 +402,6 @@ namespace CGF{
   template class SpMatrixBlock<4, double>;
   template class SpMatrixBlock<8, double>;
   template class SpMatrixBlock<16, double>;
-};
+}
 
 #endif/*SPMATRIXBLOCK_HPP*/

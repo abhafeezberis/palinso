@@ -22,7 +22,7 @@
 
 #ifndef CUDAVECTOR_HPP
 #define CUDAVECTOR_HPP
-#ifndef NO_CUDA
+#ifdef CUDA
 
 #include "math/CObject.hpp"
 #include "util/cuda_util.hpp"
@@ -129,7 +129,7 @@ namespace CGF{
     friend class CSpMatrix;
     ulong textureSize;
   };
-};
+}
 
-#endif/*NO_CUDA*/
+#endif/*CUDA*/
 #endif/*CUDAVECTOR_HPP*/

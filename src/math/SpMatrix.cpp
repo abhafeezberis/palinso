@@ -22,10 +22,10 @@
 
 #include "math/SpMatrix.hpp"
 #include "math/Vector.hpp"
-#ifndef NO_CUDA
-#include <cuda.h>
-#include "util/cuda_util.hpp"
-#endif
+//#ifndef NO_CUDA
+//#include <cuda.h>
+//#include "util/cuda_util.hpp"
+//#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

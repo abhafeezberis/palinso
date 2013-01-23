@@ -46,4 +46,4 @@ namespace CGF{
     os << t.usec << " usec elapsed" << std::endl;
     return os;
   }
-};
+}

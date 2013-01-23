@@ -67,4 +67,4 @@ namespace CGF{
     pthread_cond_broadcast(&block_cond);
     pthread_mutex_unlock(&block_mutex);
   }
-};
+}

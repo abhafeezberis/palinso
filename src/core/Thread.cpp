@@ -25,7 +25,7 @@
 #include "core/Exception.hpp"
 #include "core/ShutDownTask.hpp"
 #include <iostream>
-#ifndef NO_CUDA
+#ifdef CUDA
 #include <cuda_runtime_api.h>
 #include "util/cuda_util.hpp"
 #endif
@@ -35,7 +35,7 @@ namespace CGF{
     
   void thread_cleanup(void* arg){
     //message("Cleaning up thread objects for %d", pthread_self());
-#ifndef NO_CUDA
+#ifdef CUDA
     exit_cuda_thread();
 #endif
   }
@@ -122,4 +122,4 @@ namespace CGF{
     
     //    pthread_exit(NULL);
   }
-};
+}

@@ -55,7 +55,6 @@ namespace CGF{
     const uint n_threads;
     friend class Thread;
   };
-
-};
+}
 
 #endif/*TASK_HPP*/

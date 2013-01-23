@@ -232,7 +232,7 @@ namespace CGF{
     inline void spmatrix_block_clear(T r[N*N]){
       memset(r, 0, sizeof(T)*N*N);
     }
-  };
-};
+  }
+}
 
 #endif/*DEFAULT_SPMATRIX_INTRINSICS*/

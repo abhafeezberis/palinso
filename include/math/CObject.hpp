@@ -22,7 +22,7 @@
 
 #ifndef CUDAOBJECT_HPP
 #define CUDAOBJECT_HPP
-#ifndef NO_CUDA
+#ifdef CUDA
 #include "math/Math.hpp"
 
 namespace CGF{
@@ -68,6 +68,7 @@ namespace CGF{
     uint* startBlock;
     uint* n_blocks;
   };
-};
-#endif/*NO_CUDA*/
+}
+
+#endif/*CUDA*/
 #endif/*CUDAOBJECT_HPP*/

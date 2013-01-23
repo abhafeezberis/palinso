@@ -1527,6 +1527,6 @@ namespace CGF{
     inline void spmatrix_block_clear(T r[N*N]){
       default_proc::spmatrix_block_clear<N, T>(r);
     }
-  };
-};
+  }
+}
 #endif/*SSE2_SPMATRIX_INTRINSICS*/

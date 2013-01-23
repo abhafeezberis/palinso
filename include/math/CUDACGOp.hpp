@@ -22,7 +22,7 @@
 
 #ifndef CUDACGOP_HPP
 #define CUDACGOP_HPP
-#ifndef NO_CUDA
+#ifdef CUDA
 
 #define NTHREADS 256
 #define R_LOOP 1
@@ -99,7 +99,7 @@ namespace CGF{
     }
     return s;
   }
-};
+}
 
-#endif/*NO_CUDA*/
+#endif/*CUDA*/
 #endif/*CUDACGOP_HPP*/

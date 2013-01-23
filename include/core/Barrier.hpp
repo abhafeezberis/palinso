@@ -116,7 +116,6 @@ namespace CGF{
     mutable uint block_status;
 #endif
   };
-
-};
+}
 
 #endif/*BARRIER_HPP*/

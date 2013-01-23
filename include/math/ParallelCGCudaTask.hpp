@@ -22,7 +22,7 @@
 
 #ifndef PARALLELCGCUDATASK_HPP
 #define PARALLELCGCUDATASK_HPP
-#ifndef NO_CUDA
+#ifdef CUDA
 #include "math/Math.hpp"
 #include <cuda_runtime.h>
 #include "core/Task.hpp"
@@ -63,6 +63,13 @@ namespace CGF{
     void computePreconditioner();
     void computeDistribution();
     void prepareMatrix();
+    void setTolerance(T tol){
+      tolerance = tol;
+    }
+    void setMaxIterations(uint steps){
+      maxIterations = steps;
+    }
+
   protected:
     const ThreadPool* pool;
     Vector<T>* x;
@@ -93,8 +100,10 @@ namespace CGF{
 
     int n_cuda_threads;
     TextureOperation texture;
+    T tolerance;
+    uint maxIterations;
   };
-};
+}
 
-#endif/*NO_CUDA*/
+#endif/*CUDA*/
 #endif/*PARALLELCGCUDATASK_HPP*/

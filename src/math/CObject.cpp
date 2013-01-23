@@ -20,7 +20,7 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. */
 
-#ifndef NO_CUDA
+#ifdef CUDA
 #include "math/CObject.hpp"
 #include "core/ThreadPool.hpp"
 
@@ -97,5 +97,5 @@ namespace CGF{
     setNBlocks(obj->getNBlocks());
   }
   
-};
-#endif/*NO_CUDA*/
+}
+#endif/*CUDA*/

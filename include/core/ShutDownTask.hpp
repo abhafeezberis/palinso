@@ -42,6 +42,6 @@ namespace CGF{
     void execute(const Thread* caller){
     }
   };
-};
+}
 
 #endif/*SHUTDOWNTASK_HPP*/

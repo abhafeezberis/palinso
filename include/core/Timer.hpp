@@ -47,6 +47,6 @@ namespace CGF{
     struct timeval t1, t2, diff; 
     uint usec;
   };  
-};
+}
 
 #endif/*TIMER*/

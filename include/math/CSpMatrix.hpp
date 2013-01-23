@@ -22,7 +22,7 @@
 
 #ifndef CUDASPMATRIX_HPP
 #define CUDASPMATRIX_HPP
-#ifndef NO_CUDA
+#ifdef CUDA
 
 //#include "core/ThreadPool.hpp"
 
@@ -128,6 +128,7 @@ namespace CGF{
     template<class U>
     friend class CVector;
   };
-};
-#endif/*NO_CUDA*/
+}
+
+#endif/*CUDA*/
 #endif/*CUDASPMATRIX_HPP*/

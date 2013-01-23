@@ -48,6 +48,6 @@ namespace CGF{
   template<int N, class T>
   SpMatrix<N, T>* load_matrix_matlab(const char* filename);
   
-};
+}
 
 #endif/*MATRIX_LOADERS_HPP*/

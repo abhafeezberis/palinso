@@ -29,10 +29,6 @@
 #include "math/ParallelCGCudaTask.hpp"
 #include "core/ThreadPool.hpp"
 
-#define TOL 1e-8
-
-#define ITP float
-
 namespace CGF{
   template<int N, class T>
   class LinSolveCG : public LinSolve<N, T>{
@@ -65,7 +61,7 @@ namespace CGF{
       this->mat->finalize();
     }
 
-    virtual void solve(uint steps = 10000){
+    virtual void solve(uint steps = 100000, T tolerance = 1e-6){
       cgfassert(this->mat->getWidth() == this->b->getSize());
       cgfassert(this->mat->getWidth() == this->mat->getHeight());
       cgfassert(this->mat->getWidth() == this->x->getSize());
@@ -118,7 +114,7 @@ namespace CGF{
 	/*res = sqrt(sum(s1))*/
 	residual = scratch1->sum();
 	
-	if(sqrt(fabs(residual)) < TOL){
+	if(sqrt(fabs(residual)) < tolerance){
 	  message("Success in %d iterations, %10.10e, %10.10e", k, residual, sqrt(residual));
 	  return;
 	}
@@ -148,9 +144,9 @@ namespace CGF{
 	T beta = scratch1->sum();
 	
 #if 1
-	if(beta< TOL){
+	if(beta< tolerance){
 	  float rl = r->length2(); 
-	  if(rl<TOL){
+	  if(rl<tolerance){
 	    message("Success in %d iterations, %10.10e, %10.10e", k, rl, 
 		    sqrt(fabs(rl)));
 	    return;
@@ -182,6 +178,7 @@ namespace CGF{
     Vector<T>* u;    
   };
 
+#ifdef CUDA
   template<int N, class T>
   class LinSolveCGGPU : public LinSolve<N, T>{
   public:
@@ -238,9 +235,12 @@ namespace CGF{
       allocated = true;
     }
 
-    virtual void solve(uint steps = 10000){
+    virtual void solve(uint steps = 100000, T tolerance = 1e-6){
       cgfassert(this->mat->getWidth() == this->b->getSize());
       cgfassert(this->mat->getWidth() == this->mat->getHeight());
+
+      task->setTolerance(tolerance);
+      task->setMaxIterations(steps);
 
       /*Start the algorithm and measure the elapsed time. The measured
 	time is very close to the time measured using cudaEvents.*/
@@ -260,6 +260,7 @@ namespace CGF{
     LinSolveCGGPU(const LinSolveCGGPU&);
     LinSolveCGGPU& operator=(const LinSolveCGGPU&);
   };
+#endif
 
   template<int N, class T>
   class LinSolveCGParallel : public LinSolve<N, T>{
@@ -281,11 +282,14 @@ namespace CGF{
       task->computeDistribution();
     }
 
-    virtual void solve(uint steps = 10000){
+    virtual void solve(uint steps = 100000, T tolerance = 1e-6){
       cgfassert(this->mat->getWidth() == this->b->getSize());
       cgfassert(this->mat->getWidth() == this->mat->getHeight());
       
       this->mat->finalize();
+
+      task->setTolerance(tolerance);
+      task->setMaxIterations(steps);
 
       pool->assignTask(task);
       pool->sync();
@@ -316,6 +320,14 @@ namespace CGF{
     LinSolveCGParallel(const LinSolveCGParallel&);
     LinSolveCGParallel& operator=(const LinSolveCGParallel&);
   };
-};
+
+#ifndef CUDA
+  /*Substitute Parallel solver*/
+  template<int N, class T>
+  class LinSolveCGGPU : public LinSolveCGParallel<N, T>{
+
+  };
+#endif
+}
 
 #endif/*LINSOLVECG*/

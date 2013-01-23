@@ -20,7 +20,7 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. */
 
-#ifndef NO_CUDA
+#ifdef CUDA
 #include "math/SpMatrix.hpp"
 #include "math/CSpMatrix.hpp"
 #include "util/cuda_util.hpp"
@@ -695,6 +695,6 @@ namespace CGF{
   template class CSpMatrix<8, double>;
   //template class CSpMatrix<16, double>;
 
-};
+}
 
-#endif/*NO_CUDA*/
+#endif/*CUDA*/

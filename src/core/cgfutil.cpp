@@ -106,7 +106,7 @@ namespace CGF{
 #endif
     destroyThreadPools();
 
-#ifndef NO_CUDA
+#ifdef CUDA
     cudaThreadExit();
 #endif
   }

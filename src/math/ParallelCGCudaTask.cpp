@@ -20,7 +20,7 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. */
 
-#ifndef NO_CUDA
+#ifdef CUDA
 #include <cuda_runtime.h>
 #include "math/ParallelCGCudaTask.hpp"
 #include "core/Thread.hpp"
@@ -38,7 +38,7 @@
 
 namespace CGF{
 
-#define TOL 1e-8
+  //#define TOL 1e-8
   template<int N, class T>
   ParallelCGCudaTask<N, T>::ParallelCGCudaTask(const ThreadPool* _pool, 
 					       Vector<T>* const _x, 
@@ -46,7 +46,8 @@ namespace CGF{
 					       const Vector<T>* const _b,
 					       int n_thr, TextureOperation tex)
     : Task(_pool->getSize()), pool(_pool), x(_x), mat(_mat), b(_b), 
-      n_cuda_threads(n_thr), texture(tex){
+      n_cuda_threads(n_thr), texture(tex), tolerance(1e-6), 
+      maxIterations(100000){
 
     //init_cuda_host_thread();
 
@@ -312,9 +313,9 @@ namespace CGF{
     
     k[TID] = 0;
     
-    while(k[TID]<mat->getHeight()*1000){
+    while(k[TID]<maxIterations){
       /*Copy v to host, preparing for multiplication*/
-      if(lresidual<TOL){
+      if(lresidual<tolerance){
 	if(TID == 0){
 	  message("Succesfull in %d iterations", k[TID]);
 	}
@@ -361,12 +362,12 @@ namespace CGF{
       ls = (double)lbeta/(double)lalpha;
       lalpha = lbeta;
 #if 1
-      if(lbeta < TOL){
+      if(lbeta < tolerance){
 	parallel_cg_step_2<T>(cres, ctmp1, caller);
 	
 	lr = ctmp1->sum(caller);
 	
-	if(lr< TOL){
+	if(lr< tolerance){
 	  if(TID == 0){
 	    message("Succesfull in %d iterations", k[TID]);
 	  }
@@ -403,5 +404,5 @@ namespace CGF{
   template class ParallelCGCudaTask<4, double>;
   template class ParallelCGCudaTask<8, double>;
   //template class ParallelCGCudaTask<16, double>;
-};
-#endif/*NO_CUDA*/
+}
+#endif/*CUDA*/

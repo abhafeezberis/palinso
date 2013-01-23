@@ -20,19 +20,9 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. */
 
-#include "math/SpMatrix.hpp"
-#include <iostream>
 #include <fstream>
-#include <sstream>
-#include "util/cuda_util.hpp"
-#include <math.h>
-#include <unistd.h>
-#include "math/Vector.hpp"
-#include "core/ThreadPool.hpp"
 #include "core/Timer.hpp"
-#include "core/Exception.hpp"
 #include "math/matrix_loaders.hpp"
-#include "math/LinSolve.hpp"
 #include "math/LinSolveCG.hpp"
 
 using namespace CGF;
@@ -115,7 +105,9 @@ void large_cg_test(uint i){
 
     delete solver;
 #endif
+
 #if 1
+#ifdef CUDA
     uint n_devices = 1;
     message("Cuda test using %d devices", n_devices);
 
@@ -134,8 +126,10 @@ void large_cg_test(uint i){
     delete solver;
     
 #endif
+#endif
 
 #if 0
+#ifdef CUDA
     n_devices = 2;
     message("Cuda test using %d devices", n_devices);
 
@@ -152,7 +146,7 @@ void large_cg_test(uint i){
     message("time = %d usec\n", timer.getTimeUSec());
 
     delete solver;
-    
+#endif    
 #endif
     
     delete mat;
@@ -166,8 +160,10 @@ int main(int argc, char** argv){
 		  into a daemon process. Usefull for remote
 		  benchmarking. Output is redirected to a file.*/
 
+#ifdef CUDA
   init_cuda_host_thread();
-  
+#endif
+
   /*Adapt such that all your *.mtx files are listed. Currently it
     searches for patterns like
     ./shared/matrices/bib1/case1/case1.mtx */
