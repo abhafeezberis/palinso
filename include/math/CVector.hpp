@@ -30,6 +30,7 @@
 #include "core/Thread.hpp"
 
 namespace CGF{
+
   template<class T>
   class Vector;
 

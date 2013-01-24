@@ -38,6 +38,8 @@ namespace CGF{
 
   class BlockDiagMatrix;
 
+  class Thread;
+
   template<class T=float>
   class CGFAPI Vector{
   public:
@@ -60,7 +62,14 @@ namespace CGF{
     Vector(const Vector& v);
     virtual ~Vector();
     
+    /*Single threaded sum*/
     T sum()const;
+    
+    /*Multithreaded sum*/
+    T sum(T* sharedBuffer, const Thread* caller, 
+	  const VectorRange* rg)const;
+
+    /*Partial sum (used in parallel version)*/
     T sump(const VectorRange r)const;
 
     T& operator[](ulong i){

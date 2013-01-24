@@ -20,10 +20,10 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. */
 
+#include "math/CUDACGOp.hpp"
 #include "math/ParallelCGCudaTask.hpp"
 #include "util/cuda_util.hpp"
 #include "util/device_util.hpp"
-#include "math/CUDACGOp.hpp"
 #include "math/CVector.hpp"
 #include "core/Thread.hpp"
 

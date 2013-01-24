@@ -27,9 +27,11 @@
 #define NTHREADS 256
 #define R_LOOP 1
 
+#include "math/CVector.hpp"
+
 namespace CGF{
-  template<class T>
-  class CGFAPI CVector;
+  //template<class T>
+  //class CGFAPI CVector;
   
   /*N = block_size, T = float|doublem N_THR = 128, 256, 512, TEX=true|false*/
   /*  template<int N, class T, int N_THR, bool TEX>

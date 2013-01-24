@@ -24,6 +24,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "core/Thread.hpp"
 
 #if defined SSE2
 #include "math/x86-sse/sse_spmatrix_intrinsics.hpp"
@@ -35,6 +36,15 @@ using namespace CGF::arm_neon;
 #include "math/default/default_spmatrix_intrinsics.hpp"
 using namespace CGF::default_proc;
 #endif
+
+#define RANGE_ASSERT_A					\
+  cgfassert((r.size == a.size));			\
+  cgfassert(rg.startBlock % 16 == 0);			\
+  cgfassert(rg.endBlock   % 16 == 0);  
+
+#define RANGE_ASSERT_AB					\
+  RANGE_ASSERT_A					\
+  cgfassert((a.size == b.size));
 
 namespace CGF{
   /*The size of a vector is always a multiple of 16*/
@@ -133,6 +143,8 @@ namespace CGF{
     return stream;
   }
 
+
+  /*@TODO: Sum operators must be checked*/
   template<class T>
   T Vector<T>::sum()const{
     if(origSize == 0){
@@ -185,7 +197,7 @@ namespace CGF{
   float Vector<float>::sum()const{
     float res[4];
 
-    error();
+    //error();
 
     __m128 XMM0 = _mm_set_ps1(0);
 
@@ -209,6 +221,19 @@ namespace CGF{
 #endif
 
   template<class T>
+  T Vector<T>::sum(T* sharedReductions, const Thread* caller, 
+		   const VectorRange* rg)const{
+    sharedReductions[caller->getId()] = sump(rg[caller->getId()]);
+    caller->sync();
+
+    T result = 0;
+    for(uint i=0;i<caller->getLastId();i++){
+      result += sharedReductions[i];
+    }
+    return result;
+  }
+
+  template<class T>
   T Vector<T>::sump(const VectorRange rg)const{
     if(rg.startBlock == rg.endBlock){
       /*Range is zero.*/
@@ -225,7 +250,7 @@ namespace CGF{
       steps/=2;
       pwr++;
     }
-    steps = 1<<(pwr-1);
+    steps = 1<<(pwr);
 
     while(steps >= 1){
       for(uint j=0;j<steps;j++){
@@ -281,6 +306,7 @@ namespace CGF{
   template<>
   float Vector<float>::operator*(const Vector<float>& v) const{
     /**/
+    error("Not tested yet");
     PRINT_FUNCTION;
     uint steps = size/16;
     //uint remainder = size%16;
@@ -359,96 +385,19 @@ namespace CGF{
   void Vector<T>::madd(Vector<T>& r, const Vector<T>& a, const Vector<T>& b,
 		       const Vector<T>& c){
     for(uint i=0;i<a.size/16;i++){
-      for(uint j=0;j<16;j++){
-	r.data[i*16 + j] = (a.data[i*16 + j] * 
-			    b.data[i*16 + j] +
-			    c.data[i*16 + j]);
-      }
+      spmatrix_block_madd<4, T>(r.data+i*16, a.data+i*16, b.data+i*16, 
+				c.data+i*16);
     }
   }
-
-#ifdef SSE2
-  /*r = a * b + c*/
-  template<>
-  void Vector<float>::madd(Vector<float>& r, const Vector<float>& a, 
-			   const Vector<float>& b, 
-			   const Vector<float>& c){
-    for(uint i=0;i<a.size/16;i++){
-      __m128 XMM0 = _mm_load_ps(a.data + i * 16 + 0);
-      __m128 XMM1 = _mm_load_ps(a.data + i * 16 + 4);
-      __m128 XMM2 = _mm_load_ps(a.data + i * 16 + 8);
-      __m128 XMM3 = _mm_load_ps(a.data + i * 16 + 12);
-
-      __m128 XMM4 = _mm_load_ps(b.data + i * 16 + 0);
-      __m128 XMM5 = _mm_load_ps(b.data + i * 16 + 4);
-      __m128 XMM6 = _mm_load_ps(b.data + i * 16 + 8);
-      __m128 XMM7 = _mm_load_ps(b.data + i * 16 + 12);
-
-      __m128 XMM8  = _mm_load_ps(c.data + i * 16 + 0);
-      __m128 XMM9  = _mm_load_ps(c.data + i * 16 + 4);
-      __m128 XMM10 = _mm_load_ps(c.data + i * 16 + 8);
-      __m128 XMM11 = _mm_load_ps(c.data + i * 16 + 12);
-
-      XMM0 = _mm_add_ps(_mm_mul_ps(XMM0, XMM4), XMM8);
-      XMM1 = _mm_add_ps(_mm_mul_ps(XMM1, XMM5), XMM9);
-      XMM2 = _mm_add_ps(_mm_mul_ps(XMM2, XMM6), XMM10);
-      XMM3 = _mm_add_ps(_mm_mul_ps(XMM3, XMM7), XMM11);
-
-      _mm_store_ps(r.data + i * 16 + 0,  XMM0);
-      _mm_store_ps(r.data + i * 16 + 4,  XMM1);
-      _mm_store_ps(r.data + i * 16 + 8,  XMM2);
-      _mm_store_ps(r.data + i * 16 + 12, XMM3);
-    }
-  }
-#endif
-
 
   /*r = f * b + c*/
   template<class T>
   void Vector<T>::mfadd(Vector<T>& r, T f, const Vector<T>& b, 
 			const Vector<T>& c){
     for(uint i=0;i<b.size/16;i++){
-#if 0
-      spmatrix_block_msadd<4, T>(r.data+i*16, f, b.data+i*16, c.data+i.16);
-#else
-      for(uint j=0;j<16;j++){
-	r.data[i*16 + j] = (f * b.data[i*16 + j] + 
-			    c.data[i*16 + j]); 
-      }
-#endif
+      spmatrix_block_msadd<4, T>(r.data+i*16, f, b.data+i*16, c.data+i*16);
     }
   }
-
-#ifdef SSE2
-  /*r = f * b + c*/
-  template<>
-  void Vector<float>::mfadd(Vector<float>& r, float f, 
-			    const Vector<float>& b, 
-			    const Vector<float>& c){
-    __m128 XMM0 = _mm_set_ps1(f);
-    for(uint i=0;i<b.size/16;i++){
-      __m128 XMM4 = _mm_load_ps(b.data + i * 16 + 0);
-      __m128 XMM5 = _mm_load_ps(b.data + i * 16 + 4);
-      __m128 XMM6 = _mm_load_ps(b.data + i * 16 + 8);
-      __m128 XMM7 = _mm_load_ps(b.data + i * 16 + 12);
-
-      __m128 XMM8  = _mm_load_ps(c.data + i * 16 + 0);
-      __m128 XMM9  = _mm_load_ps(c.data + i * 16 + 4);
-      __m128 XMM10 = _mm_load_ps(c.data + i * 16 + 8);
-      __m128 XMM11 = _mm_load_ps(c.data + i * 16 + 12);
-
-      XMM4 = _mm_add_ps(_mm_mul_ps(XMM0, XMM4), XMM8);
-      XMM5 = _mm_add_ps(_mm_mul_ps(XMM0, XMM5), XMM9);
-      XMM6 = _mm_add_ps(_mm_mul_ps(XMM0, XMM6), XMM10);
-      XMM7 = _mm_add_ps(_mm_mul_ps(XMM0, XMM7), XMM11);
-
-      _mm_store_ps(r.data + i * 16 + 0,  XMM4);
-      _mm_store_ps(r.data + i * 16 + 4,  XMM5);
-      _mm_store_ps(r.data + i * 16 + 8,  XMM6);
-      _mm_store_ps(r.data + i * 16 + 12, XMM7);
-    }
-  }
-#endif
 
   /*r = a .* b*/
   template<class T>
@@ -480,58 +429,20 @@ namespace CGF{
   template<class T>
   void Vector<T>::subp(Vector<T>& r, const Vector<T>& a, const Vector<T>& b, 
 		    const VectorRange rg){
-    cgfassert((r.size == a.size) && (a.size == b.size));
-    cgfassert(rg.startBlock % 16 == 0);
-    cgfassert(rg.endBlock   % 16 == 0);
+    RANGE_ASSERT_AB;
 
     for(uint i=rg.startBlock/16; i<rg.endBlock/16; i++){
       if(i < a.size/16){
-	for(uint j=0;j<16;j++){
-	  r.data[i*16 + j] = a.data[i*16 + j] - b.data[i*16 + j];
-	}
+	spmatrix_block_sub<4, T>(r.data+i*16, a.data+i*16, b.data+i*16);
       }
     }
   }
-
-#ifdef SSE2
-  /*r = a - b*/
-  template<>
-  void Vector<float>::subp(Vector<float>& r, const Vector<float>& a, 
-			   const Vector<float>& b, 
-			   const VectorRange rg){
-    cgfassert((r.size == a.size) && (a.size == b.size));
-    cgfassert(rg.startBlock % 16 == 0);
-    cgfassert(rg.endBlock   % 16 == 0);
-
-    for(uint i=rg.startBlock/16; i<rg.endBlock/16; i++){
-      if(i < a.size/16){
-	__m128 XMM0 = _mm_load_ps(a.data + i * 16 + 0);
-	__m128 XMM1 = _mm_load_ps(a.data + i * 16 + 4);
-	__m128 XMM2 = _mm_load_ps(a.data + i * 16 + 8);
-	__m128 XMM3 = _mm_load_ps(a.data + i * 16 + 12);
-	
-	__m128 XMM4 = _mm_load_ps(b.data + i * 16 + 0);
-	__m128 XMM5 = _mm_load_ps(b.data + i * 16 + 4);
-	__m128 XMM6 = _mm_load_ps(b.data + i * 16 + 8);
-	__m128 XMM7 = _mm_load_ps(b.data + i * 16 + 12);
-	
-	XMM0 = _mm_sub_ps(XMM0, XMM4);
-	XMM1 = _mm_sub_ps(XMM1, XMM5);
-	XMM2 = _mm_sub_ps(XMM2, XMM6);
-	XMM3 = _mm_sub_ps(XMM3, XMM7);
-	
-	_mm_store_ps(r.data + i * 16 + 0,  XMM0);
-	_mm_store_ps(r.data + i * 16 + 4,  XMM1);
-	_mm_store_ps(r.data + i * 16 + 8,  XMM2);
-	_mm_store_ps(r.data + i * 16 + 12, XMM3);
-      }
-    }
-  }
-#endif
 
   template<class T>
   void Vector<T>::subsp(Vector<T>& r, const Vector<T>& a, T f,
 			const VectorRange rg){
+    RANGE_ASSERT_A;
+
     for(uint i=rg.startBlock/16; i<rg.endBlock/16; i++){
       if(i < a.size/16){
 	spmatrix_block_subs<4, T>(r.data+i*16, a.data+i*16, f);
@@ -543,58 +454,20 @@ namespace CGF{
   template<class T>
   void Vector<T>::addp(Vector<T>& r, const Vector<T>& a, const Vector<T>& b, 
 		       const VectorRange rg){
-    cgfassert((r.size == a.size) && (a.size == b.size));
-    cgfassert(rg.startBlock % 16 == 0);
-    cgfassert(rg.endBlock   % 16 == 0);
+    RANGE_ASSERT_AB;
 
     for(uint i=rg.startBlock/16;i<rg.endBlock/16;i++){
       if(i<a.size/16){
-	for(uint j=0;j<16;j++){
-	  r.data[i*16 + j] = a.data[i*16 + j] + b.data[i*16 + j];
-	}
+	spmatrix_block_add<4, T>(r.data+i*16, a.data+i*16, b.data+i*16);
       }
     }
   }
-
-#ifdef SSE2  
-  /*r = a + b*/
-  template<>
-  void Vector<float>::addp(Vector<float>& r, const Vector<float>& a, 
-			   const Vector<float>& b, 
-			   const VectorRange rg){
-    cgfassert((r.size == a.size) && (a.size == b.size));
-    cgfassert(rg.startBlock % 16 == 0);
-    cgfassert(rg.endBlock   % 16 == 0);
-
-    for(uint i=rg.startBlock/16;i<rg.endBlock/16;i++){
-      if(i<a.size/16){
-	__m128 XMM0 = _mm_load_ps(a.data + i * 16 + 0);
-	__m128 XMM1 = _mm_load_ps(a.data + i * 16 + 4);
-	__m128 XMM2 = _mm_load_ps(a.data + i * 16 + 8);
-	__m128 XMM3 = _mm_load_ps(a.data + i * 16 + 12);
-	
-	__m128 XMM4 = _mm_load_ps(b.data + i * 16 + 0);
-	__m128 XMM5 = _mm_load_ps(b.data + i * 16 + 4);
-	__m128 XMM6 = _mm_load_ps(b.data + i * 16 + 8);
-	__m128 XMM7 = _mm_load_ps(b.data + i * 16 + 12);
-	
-	XMM0 = _mm_add_ps(XMM0, XMM4);
-	XMM1 = _mm_add_ps(XMM1, XMM5);
-	XMM2 = _mm_add_ps(XMM2, XMM6);
-	XMM3 = _mm_add_ps(XMM3, XMM7);
-	
-	_mm_store_ps(r.data + i * 16 + 0,  XMM0);
-	_mm_store_ps(r.data + i * 16 + 4,  XMM1);
-	_mm_store_ps(r.data + i * 16 + 8,  XMM2);
-	_mm_store_ps(r.data + i * 16 + 12, XMM3);
-      }
-    }
-  }
-#endif
 
   template<class T>
   void Vector<T>::addsp(Vector<T>& r, const Vector<T>& a, T f,
 			const VectorRange rg){
+    RANGE_ASSERT_A;
+
     for(uint i=rg.startBlock/16; i<rg.endBlock/16; i++){
       if(i < a.size/16){
 	spmatrix_block_adds<4, T>(r.data+i*16, a.data+i*16, f);
@@ -607,229 +480,58 @@ namespace CGF{
   void Vector<T>::maddp(Vector<T>& r, const Vector<T>& a, 
 			const Vector<T>& b, const Vector<T>& c, 
 			const VectorRange rg){
-    cgfassert((r.size == a.size) && (a.size == b.size) &&
-	      (b.size == c.size));
-    cgfassert(rg.startBlock % 16 == 0);
-    cgfassert(rg.endBlock   % 16 == 0);
+    RANGE_ASSERT_AB;
 
     for(uint i=rg.startBlock/16;i<rg.endBlock/16;i++){
       if(i<a.size/16){
-	for(uint j=0;j<16;j++){
-	  r.data[i*16 + j] =
-	    a.data[i*16 + j] *
-	    b.data[i*16 + j] +
-	    c.data[i*16 + j];
-	}
+	spmatrix_block_madd<4, T>(r.data+i*16, a.data+i*16, b.data+i*16, 
+				  c.data+i*16);
       }
     }
   }
 
-#ifdef SSE2
-  /*r = a * b + c*/
-  template<>
-  void Vector<float>::maddp(Vector<float>& r, const Vector<float>& a, 
-			    const Vector<float>& b, 
-			    const Vector<float>& c, const VectorRange rg){
-    cgfassert((r.size == a.size) && (a.size == b.size) &&
-	      (b.size == c.size));
-    cgfassert(rg.startBlock % 16 == 0);
-    cgfassert(rg.endBlock   % 16 == 0);
-
-    for(uint i=rg.startBlock/16;i<rg.endBlock/16;i++){
-      if(i<a.size/16){
-	__m128 XMM0 = _mm_load_ps(a.data + i * 16 + 0);
-	__m128 XMM1 = _mm_load_ps(a.data + i * 16 + 4);
-	__m128 XMM2 = _mm_load_ps(a.data + i * 16 + 8);
-	__m128 XMM3 = _mm_load_ps(a.data + i * 16 + 12);
-	
-	__m128 XMM4 = _mm_load_ps(b.data + i * 16 + 0);
-	__m128 XMM5 = _mm_load_ps(b.data + i * 16 + 4);
-	__m128 XMM6 = _mm_load_ps(b.data + i * 16 + 8);
-	__m128 XMM7 = _mm_load_ps(b.data + i * 16 + 12);
-	
-	__m128 XMM8  = _mm_load_ps(c.data + i * 16 + 0);
-	__m128 XMM9  = _mm_load_ps(c.data + i * 16 + 4);
-	__m128 XMM10 = _mm_load_ps(c.data + i * 16 + 8);
-	__m128 XMM11 = _mm_load_ps(c.data + i * 16 + 12);
-	
-	XMM0 = _mm_add_ps(_mm_mul_ps(XMM0, XMM4), XMM8);
-	XMM1 = _mm_add_ps(_mm_mul_ps(XMM1, XMM5), XMM9);
-	XMM2 = _mm_add_ps(_mm_mul_ps(XMM2, XMM6), XMM10);
-	XMM3 = _mm_add_ps(_mm_mul_ps(XMM3, XMM7), XMM11);
-	
-	_mm_store_ps(r.data + i * 16 + 0,  XMM0);
-	_mm_store_ps(r.data + i * 16 + 4,  XMM1);
-	_mm_store_ps(r.data + i * 16 + 8,  XMM2);
-	_mm_store_ps(r.data + i * 16 + 12, XMM3);
-      }
-    }
-  }
-#endif
-
-  /*r = f * b + c*/
+  /*r = f * a + b*/
   template<class T>
   void Vector<T>::mfaddp(Vector<T>& r, T f, 
+			 const Vector<T>& a, 
 			 const Vector<T>& b, 
-			 const Vector<T>& c, 
 			 const VectorRange rg){
-    cgfassert((r.size == b.size) && (b.size == c.size));
-    cgfassert(rg.startBlock % 16 == 0);
-    cgfassert(rg.endBlock   % 16 == 0);
+    RANGE_ASSERT_AB;
 
     for(uint i=rg.startBlock/16;i<rg.endBlock/16;i++){
-      if(i<b.size/16){
-	for(uint j=0;j<16;j++){
-	  r.data[i*16 + j] = 
-	    f * b.data[i*16 + j] + c.data[i*16 + j];
-	}
+      if(i<a.size/16){
+	spmatrix_block_msadd<4, T>(r.data+i*16, f, a.data+i*16, b.data+i*16);
       }
     }
   }
 
-#ifdef SSE2  
-  /*r = f * b + c*/
-  template<>
-  void Vector<float>::mfaddp(Vector<float>& r, float f, 
-			 const Vector<float>& b, 
-			 const Vector<float>& c, 
-			 const VectorRange rg){
-    cgfassert((r.size == b.size) && (b.size == c.size));
-    cgfassert(rg.startBlock % 16 == 0);
-    cgfassert(rg.endBlock   % 16 == 0);
-
-    __m128 XMM0 = _mm_set_ps1(f);
-
-    for(uint i=rg.startBlock/16;i<rg.endBlock/16;i++){
-      if(i<b.size/16){
-	__m128 XMM4 = _mm_load_ps(b.data + i * 16 + 0);
-	__m128 XMM5 = _mm_load_ps(b.data + i * 16 + 4);
-	__m128 XMM6 = _mm_load_ps(b.data + i * 16 + 8);
-	__m128 XMM7 = _mm_load_ps(b.data + i * 16 + 12);
-	
-	__m128 XMM8  = _mm_load_ps(c.data + i * 16 + 0);
-	__m128 XMM9  = _mm_load_ps(c.data + i * 16 + 4);
-	__m128 XMM10 = _mm_load_ps(c.data + i * 16 + 8);
-	__m128 XMM11 = _mm_load_ps(c.data + i * 16 + 12);
-	
-	XMM4 = _mm_add_ps(_mm_mul_ps(XMM0, XMM4), XMM8);
-	XMM5 = _mm_add_ps(_mm_mul_ps(XMM0, XMM5), XMM9);
-	XMM6 = _mm_add_ps(_mm_mul_ps(XMM0, XMM6), XMM10);
-	XMM7 = _mm_add_ps(_mm_mul_ps(XMM0, XMM7), XMM11);
-	
-	_mm_store_ps(r.data + i * 16 + 0,  XMM4);
-	_mm_store_ps(r.data + i * 16 + 4,  XMM5);
-	_mm_store_ps(r.data + i * 16 + 8,  XMM6);
-	_mm_store_ps(r.data + i * 16 + 12, XMM7);
-      }
-    }
-  }
-#endif
 
   /*r = a .* b*/
   template<class T>
   void Vector<T>::mulp(Vector<T>& r, const Vector<T>& a, 
 		       const Vector<T>& b, 
 		       const VectorRange rg){
-    cgfassert((r.size == a.size) && (a.size == b.size));
-    cgfassert(rg.startBlock % 16 == 0);
-    cgfassert(rg.endBlock   % 16 == 0);
+    RANGE_ASSERT_AB;
 
     for(uint i=rg.startBlock/16;i<rg.endBlock/16;i++){
       if(i<a.size/16){
-	for(uint j=0;j<16;j++){
-	  r.data[i*16 + j] = 
-	    a.data[i*16 + j] *
-	    b.data[i*16 + j];
-	}
+	spmatrix_block_mul<4, T>(r.data+i*16, a.data+i*16, b.data+i*16);
       }
     }
   }
-
-#ifdef SSE2
-  /*r = a .* b*/
-  template<>
-  void Vector<float>::mulp(Vector<float>& r, const Vector<float>& a, 
-		       const Vector<float>& b, 
-		       const VectorRange rg){
-    cgfassert((r.size == a.size) && (a.size == b.size));
-    cgfassert(rg.startBlock % 16 == 0);
-    cgfassert(rg.endBlock   % 16 == 0);
-
-    for(uint i=rg.startBlock/16;i<rg.endBlock/16;i++){
-      if(i<a.size/16){
-	__m128 XMM0 = _mm_load_ps(a.data + i * 16 + 0);
-	__m128 XMM1 = _mm_load_ps(a.data + i * 16 + 4);
-	__m128 XMM2 = _mm_load_ps(a.data + i * 16 + 8);
-	__m128 XMM3 = _mm_load_ps(a.data + i * 16 + 12);
-	
-	__m128 XMM4 = _mm_load_ps(b.data + i * 16 + 0);
-	__m128 XMM5 = _mm_load_ps(b.data + i * 16 + 4);
-	__m128 XMM6 = _mm_load_ps(b.data + i * 16 + 8);
-	__m128 XMM7 = _mm_load_ps(b.data + i * 16 + 12);
-	
-	XMM0 = _mm_mul_ps(XMM0, XMM4);
-	XMM1 = _mm_mul_ps(XMM1, XMM5);
-	XMM2 = _mm_mul_ps(XMM2, XMM6);
-	XMM3 = _mm_mul_ps(XMM3, XMM7);
-	
-	_mm_store_ps(r.data + i * 16 + 0,  XMM0);
-	_mm_store_ps(r.data + i * 16 + 4,  XMM1);
-	_mm_store_ps(r.data + i * 16 + 8,  XMM2);
-	_mm_store_ps(r.data + i * 16 + 12, XMM3);
-      }
-    }
-  }
-#endif
 
   /*r = a * f*/
   template<class T>
   void Vector<T>::mulfp(Vector<T>& r, const Vector<T>& a, T f, 
 			const VectorRange rg){
-    cgfassert((r.size == a.size));
-    cgfassert(rg.startBlock % 16 == 0);
-    cgfassert(rg.endBlock   % 16 == 0);
+    RANGE_ASSERT_A;
 
     for(uint i=rg.startBlock/16;i<rg.endBlock/16;i++){
       if(i<a.size/16){
-	for(uint j=0;j<16;j++){
-	  r.data[i*16 + j] = 
-	    a.data[i*16 + j] * f;
-	}
+	spmatrix_block_muls<4, T>(r.data+i*16, a.data+i*16, f);
       }
     }
   } 
-  
-#ifdef SSE2
-  /*r = a * f*/
-  template<>
-  void Vector<float>::mulfp(Vector<float>& r, const Vector<float>& a, float f, 
-			const VectorRange rg){
-    cgfassert((r.size == a.size));
-    cgfassert(rg.startBlock % 16 == 0);
-    cgfassert(rg.endBlock   % 16 == 0);
-
-    __m128 XMM4 = _mm_set_ps1(f);
-
-    for(uint i=rg.startBlock/16;i<rg.endBlock/16;i++){
-      if(i<a.size/16){
-	__m128 XMM0 = _mm_load_ps(a.data + i * 16 + 0);
-	__m128 XMM1 = _mm_load_ps(a.data + i * 16 + 4);
-	__m128 XMM2 = _mm_load_ps(a.data + i * 16 + 8);
-	__m128 XMM3 = _mm_load_ps(a.data + i * 16 + 12);
-	
-	XMM0 = _mm_mul_ps(XMM0, XMM4);
-	XMM1 = _mm_mul_ps(XMM1, XMM4);
-	XMM2 = _mm_mul_ps(XMM2, XMM4);
-	XMM3 = _mm_mul_ps(XMM3, XMM4);
-	
-	_mm_store_ps(r.data + i * 16 + 0,  XMM0);
-	_mm_store_ps(r.data + i * 16 + 4,  XMM1);
-	_mm_store_ps(r.data + i * 16 + 8,  XMM2);
-	_mm_store_ps(r.data + i * 16 + 12, XMM3);
-      }
-    }
-  } 
-#endif
 
   template<class T>
   Vector<T>& Vector<T>::operator+=(const Vector<T>& v){

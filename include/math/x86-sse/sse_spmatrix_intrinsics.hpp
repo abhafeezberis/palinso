@@ -1514,13 +1514,13 @@ namespace CGF{
     template<int N, class T>
     inline void spmatrix_block_madd(T r[N*N], const T a[N*N], const T b[N*N], 
 				    const T c[N*N]){
-      default_proc::spmatrix_block_madd(r, a, b, c);
+      default_proc::spmatrix_block_madd<N, T>(r, a, b, c);
     }
 
     template<int N, class T>
     inline void spmatrix_block_msadd(T r[N*N], T f, 
 				     const T a[N*N], const T b[N*N]){
-      default_proc::spmatrix_block_msadd(r, f, a, b);
+      default_proc::spmatrix_block_msadd<N, T>(r, f, a, b);
     }
 
     template<int N, class T>
