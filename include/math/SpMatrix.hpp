@@ -209,12 +209,9 @@ namespace CGF{
     Vector<T>* solveSystemBICGSTABParallel(const Vector<T>* b, 
 					   ThreadPool* pool);
 #endif
-#ifndef NO_CUDA 
+#ifndef NO_CUDA
     Vector<T>* solveSystemCGCuda(const Vector<T>* b, ThreadPool* pool); 
 #endif
-
-    /*Symmetric Power Method*/
-    float dominantEigenValue();
 
     template<int M, class TT>
       friend void spmv(Vector<TT>& r, const SpMatrix<M, TT>& m, 

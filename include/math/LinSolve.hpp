@@ -43,6 +43,8 @@ namespace CGF{
       externalAllocatedMat = false;
       externalAllocatedb   = false;
       externalAllocatedx   = false;
+
+      iterations = 0;
     }
 
     virtual ~ LinSolve(){
@@ -69,6 +71,10 @@ namespace CGF{
 
     uint getDim()const{
       return dim;
+    }
+
+    uint getIterations(){
+      return iterations;
     }
 
     /*Functions for replacing A, x, b by versions allocated elsewhere.
@@ -109,6 +115,7 @@ namespace CGF{
     bool externalAllocatedMat;
     bool externalAllocatedb;
     bool externalAllocatedx;
+    uint iterations;
   };
 }
 

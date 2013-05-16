@@ -82,10 +82,15 @@ namespace CGF{
     measure_precision<float>();
     measure_precision<double>();
   }
+
+  bool cudaHostthreadInitialized = false;
   
   void init_cuda_host_thread(){
     //cudaSafeCall(cudaDeviceReset());
-    cudaSafeCall(cudaSetDeviceFlags(cudaDeviceMapHost));
+    if(cudaHostthreadInitialized == false){
+      cudaSafeCall(cudaSetDeviceFlags(cudaDeviceMapHost));
+      cudaHostthreadInitialized = true;
+    }
   }
   
   void exit_cuda_thread(){

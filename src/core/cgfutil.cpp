@@ -38,7 +38,7 @@
 #include "core/ThreadPool.hpp"
 #include "core/daemon.hpp"
 
-#ifndef NO_CUDA
+#ifndef CUDA
 #include <cuda_runtime_api.h>
 #endif
 
@@ -49,9 +49,6 @@ namespace CGF{
   uint traceLevel = 0;
   struct timeval start_time;
   pthread_mutex_t msg_mutex;
-  static bool messages_enabled = true;
-  //static std::streambuf *oldstdcout = 0;
-  //static int message_enabled_stack = 0;
 
   /*Static map which contains all instances of threadpools*/
   static std::map<uint, ThreadPool*> threadPools;
@@ -96,6 +93,10 @@ namespace CGF{
     threadPools.clear();
   }
 
+#ifdef CUDA
+  extern bool cudaHostthreadInitialized;
+#endif
+
   void destroy(){
 #ifdef NOISE
     Random<float>::destroy();
@@ -107,7 +108,10 @@ namespace CGF{
     destroyThreadPools();
 
 #ifdef CUDA
-    cudaThreadExit();
+    if(cudaHostthreadInitialized){
+      cudaThreadExit();
+      cudaHostthreadInitialized = false;
+    }
 #endif
   }
 
@@ -124,47 +128,7 @@ namespace CGF{
     return seed;
   }
 
-  /*if message_enabled_stack >= 0 -> messages_enabled = true
-    if message_enabled_stack <  0 -> messages_enabled = false
-   */
-
-  void enableMessages(){
-#if 0
-    pthread_mutex_lock(&msg_mutex);
-    message_enabled_stack++;
-#if 1
-    if(message_enabled_stack >= 0){
-      if(!messages_enabled){
-	messages_enabled = true;
-	std::cout.rdbuf(oldstdcout);
-      } 
-    }
-#endif
-    pthread_mutex_unlock(&msg_mutex);
-#endif
-  }
-
-  void disableMessages(){
-#if 0
-    pthread_mutex_lock(&msg_mutex);
-    message_enabled_stack--;
-#if 1
-    if(message_enabled_stack < 0){
-      if(messages_enabled){
-	messages_enabled = false;
-	oldstdcout = std::cout.rdbuf();
-	std::cout.rdbuf(0);
-      }
-    }
-#endif
-    pthread_mutex_unlock(&msg_mutex);
-#endif
-  }
-
   void message(const char* format, ...){
-    if(!messages_enabled){
-      return;
-    }
     va_list args;
     timeval now;
     timeval diff;
@@ -202,11 +166,12 @@ namespace CGF{
 
     va_start(args, format);
     vfprintf(stderr, format, args);
+    fprintf(stderr,"\n");
     fflush(stderr);
     /*Since we abort the program, flush stdout*/
     fflush(stdout);
     va_end(args);
-    fprintf(stderr,"\n");
+
     pthread_mutex_unlock(&msg_mutex);
     abort();
   }
@@ -265,76 +230,5 @@ namespace CGF{
     }
     return h;
   }
-
-#if 0
-  extern CGFAPI CGFuint cpuid();
-
-#define CPU_HAS_TSC               0x001
-#define CPU_HAS_MMX               0x002
-#define CPU_HAS_MMXEX             0x004
-#define CPU_HAS_SSE               0x008
-#define CPU_HAS_SSE2              0x010
-#define CPU_HAS_3DNOW             0x020
-#define CPU_HAS_3DNOWEXT          0x040
-#define CPU_HAS_SSE3              0x080
-#define CPU_HAS_HT                0x100
-
-#define cpuid(op, eax, ecx, edx)		\
-  asm volatile ("pushl %%ebx \n\t"		\
-                "cpuid       \n\t"		\
-		"popl  %%ebx \n\t"		\
-		: "=a" (eax),			\
-		  "=c" (ecx),			\
-		  "=d" (edx)			\
-		: "a"  (op)			\
-		: "cc")
-
-  uint cpuid(){
-    uint eax, ecx, edx, caps;
-#if !(defined(__i586__) || defined(__i686__) || defined(__athlon__) || defined(__pentium4__) || defined(__x86_64__))
-    asm volatile ("pushfl             \n\t"
-		  "popl  %0           \n\t"
-		  "movl  %0,%1        \n\t"
-		  "xorl  $0x200000,%0 \n\t"
-		  "pushl %0           \n\t"
-		  "popfl              \n\t"
-		  "pushfl             \n\t"
-		  "popl  %0           \n\t"
-		  : "=a" (eax),
-		    "=d" (edx)
-		  :
-		  : "cc");
-    if(eax==edx)
-      return 0;
-#endif
-    caps = 0;
-    cpuid(0x00000000, eax, ecx, edx);
-    if(eax){
-      // AMD:   ebx="Auth" edx="enti" ecx="cAMD"
-      // Intel: ebx="Genu" edx="ineI" ecx="ntel"
-      // VIAC3: ebx="Cent" edx="aurH" ecx="auls"
-
-      if((ecx==0x444d4163) && (edx==0x69746e65)){
-	cpuid(0x80000000, eax, ecx, edx);
-	if(eax>0x80000000){
-	  cpuid(0x80000001, eax, ecx, edx);
-	  if(edx&0x08000000) caps |= CPU_HAS_MMXEX;
-	  if(edx&0x80000000) caps |= CPU_HAS_3DNOW;
-	  if(edx&0x40000000) caps |= CPU_HAS_3DNOWEXT;
-	}
-      }
-
-      cpuid(0x00000001, eax, ecx, edx);
-      if(edx&0x00000010) caps |= CPU_HAS_TSC;
-      if(edx&0x00800000) caps |= CPU_HAS_MMX;
-      if(edx&0x02000000) caps |= CPU_HAS_SSE;
-      if(edx&0x04000000) caps |= CPU_HAS_SSE2;
-      if(edx&0x10000000) caps |= CPU_HAS_HT;
-      if(edx&0x00000001) caps |= CPU_HAS_SSE3;
-    }
-
-    return caps;
-  }
-#endif
 }
 

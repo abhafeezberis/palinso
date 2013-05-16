@@ -35,11 +35,6 @@
 #include "core/ThreadPool.hpp"
 #include "core/Timer.hpp"
 
-#include <vector>
-#include <list>
-#include <algorithm>
-#include <limits>
-
 #include "core/Exception.hpp"
 
 namespace CGF{
@@ -1044,65 +1039,6 @@ namespace CGF{
       mRange[i].range = mRange[i].endRow - mRange[i].startRow;
     }
   }
-
-  /*Symmetric Power Method*/
-  template<int N, class T>
-  float SpMatrix<N, T>::dominantEigenValue(){
-    cgfassert(getWidth() == getHeight());
-    finalize();
-
-    int k=1;
-    Vector<T>* x = new Vector<T>(getHeight());
-    Vector<T>* y = new Vector<T>(getHeight());
-    Vector<T>* scratch1 = new Vector<T>(getHeight());
-    Vector<T>* scratch2 = new Vector<T>(getHeight());
-
-    for(uint i=0;i<getHeight();i++){
-      (*x)[i]=0.0;
-    }
-
-    (*x)[(uint)0] = 1.0;
-
-    while(k<1000000){
-      spmv(*y, *this, *x);
-
-      Vector<T>::mul(*scratch1, *x, *y);
-
-      T mu = scratch1->sum();
-
-      T ylength = y->length();
-
-      if(ylength < 1E-6){
-	delete scratch1;
-	delete scratch2;
-	delete x;
-	delete y;
-	message("Eigenvalue = 0");
-	return 0;
-      }
-      Vector<T>::mulf(*scratch1, *y, (T)1.0/ylength);
-      Vector<T>::sub(*scratch2, *x, *scratch1);
-
-      T err = scratch2->length();
-
-      Vector<T>::mulf(*x, *scratch1, (T)1.0);
-
-      if(err < 1E-6){
-	delete scratch1;
-	delete scratch2;
-	delete x;
-	delete y;
-	return mu;
-      }
-      k++;
-    }
-    delete scratch1;
-    delete scratch2;
-    delete x;
-    delete y;
-    return 0;
-  }
-
 
 #if 0  
   template SpMatrix<1, float>* SpMatrix<1, float>::reorderRCM()const;

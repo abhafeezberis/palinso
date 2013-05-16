@@ -4,32 +4,36 @@
 #This master MAKEFILE is included in a local, project specific
 #Makefile, which defines some paths and local rules
 
-#Making with CUDA=0 prevents from compiling CUDA code and including
+#Making with NOCUDA=1 prevents from compiling CUDA code and including
 #CUDA startup code for projects which do not depend on CUDA
 
-CUDA	= 1
+NOCUDA	= 0
 NOSSE2	= 0
-NOSDL   = 0
+NOSDL   = 1
 DEBUG   = 0
 
 #QT Library stuff
-MOC4			= moc
+MOC4			= moc-qt4
 ifeq ($(DEBUG),1)
 STRIP_FLAGS		= 
-COMPILATION_FLAGS       = -O0 -g -D_DEBUG 
-#-pg
+COMPILATION_FLAGS       = -O0 -g -D_DEBUG
 else
 STRIP_FLAGS		= -ffunction-sections -fdata-sections 
 COMPILATION_FLAGS       = -O4 -DN_DEBUG 
-#-pg
 endif
 #COMPILATION_FLAGS 	= -O0 -pg -g -D_DEBUG
 #
 
-ifeq ($(CUDA),1)
-CUDA_LIBS		= -lcudart 
-else
+#CUDA Library stuff
+#CUDA_INSTALL_PATH	= /usr/local/cuda
+#CUDA_INCLUDE_PATH	= $(CUDA_INSTALL_PATH)/include
+#CUDA_LIB_PATH		= $(CUDA_INSTALL_PATH)/lib64
+#CUDA_LIBS		= -lcuda -L$(CUDA_LIB_PATH) -lcudart 
+#CUDA_LIBS		= -L$(CUDA_LIB_PATH) -lcudart -lcublas
+ifeq ($(NOCUDA),1)
 #CUDA_LIBS		=
+else
+CUDA_LIBS		= -lcudart 
 endif
 #-lcublas
 
@@ -39,8 +43,18 @@ else
 SDL := -DSDL
 endif
 
+#CGF Library stuff
+CGF_INSTALL_PATH	= .
+CGF_INCLUDE_PATH	= $(CGF_INSTALL_PATH)/include
+#CGF_LIB_PATH		= $(CGF_INSTALL_PATH)/../lib
+#CGF_LIB			= $(CGF_LIB_PATH)/cgf.a
+#CGF_DEBUG_LIB		= $(CGF_LIB_PATH)/cgfd.a
+
+BENCHMARK		= -DN_BENCHMARK	
+
 #Compiler flags
-INCLUDES	+= -I./include 
+INCLUDES	+= -I./include -I$(CGF_INCLUDE_PATH) 
+INCLUDES	+= -I/usr/include/freetype2 
 
 ifeq ($(NOSSE2),1)
 SSE2	:=
@@ -48,28 +62,29 @@ else
 SSE2	:= -DSSE2
 endif
 
-CCFLAGS := $(INCLUDES) -Wall -Werror $(COMPILATION_FLAGS) $(STRIP_FLAGS) -DUNIX $(GPU) -D_REENTRANT -ansi -pedantic $(SSE2) $(BENCHMARK)
+CCFLAGS := $(INCLUDES) -Wall -Werror $(COMPILATION_FLAGS) $(STRIP_FLAGS) -DUNIX $(GPU) -D_REENTRANT -ansi $(SSE2) $(BENCHMARK) $(SDL)
 
 #CUDA Compiler flags
-ifeq ($(CUDA),1)
-NVCCFLAGS	+= -Xcompiler "" $(INCLUDES) -DUNIX -DCUDA $(COMPILATION_FLAGS) -arch sm_13
-#--compiler-bindir=/usr/bin/gcc-4.4 
-#--device-emulation
-CCFLAGS		+= -DCUDA	
-else
+ifeq ($(NOCUDA),1)
 NVCCFLAGS	=
+CCFLAGS		+= -DNO_CUDA	
+else
+NVCCFLAGS	+= -Xcompiler "" $(INCLUDES) -DCUDA -DUNIX $(DGPU) $(COMPILATION_FLAGS) -arch sm_13 $(BENCHMARK) --compiler-bindir=/usr/bin/gcc-4.4 
+#--device-emulation
+CCFLAGS		+= -DCUDA
 endif
 
 #Link against this libraries
 LIBS 	:= 
+##-lGLEW -lSDL -lftgl
 
 #Compilers
 CC 	= g++
 CPP	= g++
-ifeq ($(CUDA),1)
-NVCC	= nvcc
-else
+ifeq ($(NOCUDA),1)
 NVCC	=
+else
+NVCC	= nvcc
 endif
 
 #Default seachpath for MAKE
@@ -81,28 +96,26 @@ CFILES	:= $(wildcard $(patsubst %, %/*.c, $(MODULES)))
 CCFILES	:= $(wildcard $(patsubst %, %/*.cpp, $(MODULES)))
 CUFILES	:= $(wildcard $(patsubst %, %/*.cu, $(MODULES)))
 HPPFILES:= $(wildcard $(patsubst %, %/*.hpp, include))
-MPPFILES:= $(wildcard $(patsubst %, %/*.hpp, $(QT_MOC_DIR)))
 
 #Create a list of object ande dependency files
-ifeq ($(CUDA),1)
-OBJ	:= $(CFILES:.c=.o) $(CCFILES:.cpp=.o) $(CUFILES:.cu=.o)
-else
+ifeq ($(NOCUDA),1)
 OBJ	:= $(CFILES:.c=.o) $(CCFILES:.cpp=.o)
+else
+OBJ	:= $(CFILES:.c=.o) $(CCFILES:.cpp=.o) $(CUFILES:.cu=.o)
 endif
 
 DEPS 	:= $(OBJ:.o=.dep)
 COBJ	+= $(OBJ)
-ifeq ($(CUDA),1)
-CUBIN	:= $(CUFILES:.cu=.cubin)
-CUPTX 	:= $(CUFILES:.cu=.ptx)
-else
+ifeq ($(NOCUDA),1)
 CUBIN	:= 
 CUPTX	:=
+else
+CUBIN	:= $(CUFILES:.cu=.cubin)
+CUPTX 	:= $(CUFILES:.cu=.ptx)
 endif
 
 ASM     := $(CCFILES:.cpp=.s)
-MOCS	:= $(MPPFILES:.hpp=.moc)
-#DEPS 	+= $(MOCS)
+MOCS	:= $(HPPFILES:.hpp=.moc)
 
 #Temporary emacs files
 TEMPFILES += $(CFILES:.c=.c~) $(CCFILES:.cpp=.cpp~) $(CUFILES:.cu=.cu~)
@@ -118,25 +131,24 @@ TEMPFILES += $(HPPFILES:.hpp=.hpp~)
 %.s:	%.cpp
 	$(CPP) $(CCFLAGS) -S $< -o $@
 
-ifeq ($(CUDA),1)
+ifeq ($(NOCUDA),1)
+
+else
 %.o:	%.cu
 	$(NVCC) -o $@ -c  $< $(NVCCFLAGS) 
-else
-
 endif
 
 %.moc:	%.hpp
-	$(MOC4) -o $@ $<
-#	$(MOC4) -o $@ $<	
+	$(MOC4) -o $(^D)/$@ $<
 
-ifeq ($(CUDA),1)
+ifeq ($(NOCUDA),1)
+
+else
 %.cubin:	%.cu
 	$(NVCC) -o $@ $< $(NVCCFLAGS) --cubin 
 
 %.ptx:	%.cu
 	$(NVCC) -o $@ $< $(NVCCFLAGS) --ptx 
-else
-
 endif
 
 nocuda:
@@ -151,7 +163,6 @@ touchdep: $(DEPS)
 ifeq ($(DEBUG),1)
 _main:	$(DEPS) $(OBJ) touchdep
 	$(CC) -o $(EXE) $(COBJ) $(LIBS)
-#-pg
 else
 _main:	$(DEPS) $(OBJ) touchdep
 	$(CC) -o $(EXE) $(COBJ) $(LIBS) -Wl,-s -Wl,--gc-sections
@@ -175,11 +186,11 @@ debug_lib: $(DEPS) $(OBJ) $(CUBIN)
 %.dep: 	%.cpp
 	@./$(SHARED_PATH)/dep.sh `dirname $*.cpp` $(CCFLAGS) $*.cpp > $@	
 
-ifeq ($(CUDA),1)
+ifeq ($(NOCUDA),1)
+
+else
 %.dep: 	%.cu
 	@./$(SHARED_PATH)/nvdep.sh `dirname $*.cu` $(NVCCFLAGS) $*.cu > $@	
-else
-
 endif
 #	$(NVCC) -M $(NVCCFLAGS) $< > $@
 
@@ -195,10 +206,7 @@ endif
 endif
 
 clean_dep: clean
-	rm -f $(DEPS)
-
-#Forces make to create the moc files
-qt:	$(MOCS) all
+	rm -f $(DEPS) 
 
 
 

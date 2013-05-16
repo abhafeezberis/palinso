@@ -82,8 +82,6 @@ namespace CGF{
   extern CGFAPI uint cgfmalloc(void** ptr, ulong size);
   extern CGFAPI void cgffree(void** ptr);
   extern CGFAPI void gettimediffstring(char* buffer, timeval diff);
-  extern CGFAPI void disableMessages();
-  extern CGFAPI void enableMessages();
   extern CGFAPI void swapOutputStream();
   extern CGFAPI void warning(const char* format = "", ... );
   extern CGFAPI void message(const char* format = "", ... );

@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 by Mickeal Verschoor
+/* Copyright (C) 2012 by Mickeal Verschoor
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation

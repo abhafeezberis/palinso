@@ -117,6 +117,16 @@ namespace CGF{
     return a;
   }
 
+  inline float clamp(float a, float min, float max){
+    //return a;
+    if(a < min){
+      return min;
+    }else if(a > max){
+      return max;
+    }
+    return a;
+  }
+
   inline float round(float f){
     //f *= 10;
     if(sqrf(f) < 1E-5){

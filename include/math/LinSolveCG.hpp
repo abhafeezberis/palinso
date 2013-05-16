@@ -66,6 +66,8 @@ namespace CGF{
       cgfassert(this->mat->getWidth() == this->mat->getHeight());
       cgfassert(this->mat->getWidth() == this->x->getSize());
 
+      this->iterations = 0;
+
       for(uint i=0;i<this->mat->getHeight();i++){
 #if 1
 	//(*this->x)[i] = 0;
@@ -108,14 +110,15 @@ namespace CGF{
       
       while(k<steps){
 	/*s1 = v * v*/
+	this->iterations++;
 	Vector<T>::mul(*scratch1, *v, *v);
 	T residual;
-	
+
 	/*res = sqrt(sum(s1))*/
 	residual = scratch1->sum();
 	
 	if(sqrt(fabs(residual)) < tolerance){
-	  message("Success in %d iterations, %10.10e, %10.10e", k, residual, sqrt(residual));
+	  warning("CG::Success in %d iterations, %10.10e, %10.10e", k, residual, sqrt(residual));
 	  return;
 	}
 	
@@ -147,7 +150,7 @@ namespace CGF{
 	if(beta< tolerance){
 	  float rl = r->length2(); 
 	  if(rl<tolerance){
-	    message("Success in %d iterations, %10.10e, %10.10e", k, rl, 
+	    warning("CG::Success in %d iterations, %10.10e, %10.10e", k, rl, 
 		    sqrt(fabs(rl)));
 	    return;
 	  }
