@@ -21,21 +21,12 @@ else
 STRIP_FLAGS		= -ffunction-sections -fdata-sections 
 COMPILATION_FLAGS       = -O4 -DN_DEBUG 
 endif
-#COMPILATION_FLAGS 	= -O0 -pg -g -D_DEBUG
-#
 
-#CUDA Library stuff
-#CUDA_INSTALL_PATH	= /usr/local/cuda
-#CUDA_INCLUDE_PATH	= $(CUDA_INSTALL_PATH)/include
-#CUDA_LIB_PATH		= $(CUDA_INSTALL_PATH)/lib64
-#CUDA_LIBS		= -lcuda -L$(CUDA_LIB_PATH) -lcudart 
-#CUDA_LIBS		= -L$(CUDA_LIB_PATH) -lcudart -lcublas
 ifeq ($(NOCUDA),1)
 #CUDA_LIBS		=
 else
 CUDA_LIBS		= -lcudart 
 endif
-#-lcublas
 
 ifeq ($(NOSDL),1)
 SDL :=
@@ -54,7 +45,6 @@ BENCHMARK		= -DN_BENCHMARK
 
 #Compiler flags
 INCLUDES	+= -I./include -I$(CGF_INCLUDE_PATH) 
-INCLUDES	+= -I/usr/include/freetype2 
 
 ifeq ($(NOSSE2),1)
 SSE2	:=
@@ -69,14 +59,12 @@ ifeq ($(NOCUDA),1)
 NVCCFLAGS	=
 CCFLAGS		+= -DNO_CUDA	
 else
-NVCCFLAGS	+= -Xcompiler "" $(INCLUDES) -DCUDA -DUNIX $(DGPU) $(COMPILATION_FLAGS) -arch sm_13 $(BENCHMARK) --compiler-bindir=/usr/bin/gcc-4.4 
-#--device-emulation
+NVCCFLAGS	+= -Xcompiler "" $(INCLUDES) -DCUDA -DUNIX $(DGPU) $(COMPILATION_FLAGS) -arch sm_13 $(BENCHMARK) 
 CCFLAGS		+= -DCUDA
 endif
 
-#Link against this libraries
+#Link against these libraries
 LIBS 	:= 
-##-lGLEW -lSDL -lftgl
 
 #Compilers
 CC 	= g++
@@ -161,10 +149,10 @@ touchdep: $(DEPS)
 #Rule for linking main executable
 # $(CUBIN) #$(CUPTX) #$(ASM)
 ifeq ($(DEBUG),1)
-_main:	$(DEPS) $(OBJ) touchdep
+_main:	update_dep $(DEPS) $(OBJ)
 	$(CC) -o $(EXE) $(COBJ) $(LIBS)
 else
-_main:	$(DEPS) $(OBJ) touchdep
+_main:	update_dep $(DEPS) $(OBJ)
 	$(CC) -o $(EXE) $(COBJ) $(LIBS) -Wl,-s -Wl,--gc-sections
 endif
 #
@@ -179,6 +167,7 @@ debug_lib: $(DEPS) $(OBJ) $(CUBIN)
 	ar rcs $(STATIC_DEBUG_LIB) $(OBJ)
 
 #	$(CC) -M $(CCFLAGS) > $@
+
 #Rules for creating dependencies
 %.dep: 	%.c
 	@./$(SHARED_PATH)/dep.sh `dirname $*.c` $(CCFLAGS) $*.c > $@	
@@ -201,12 +190,15 @@ clean:
 
 ifneq ($(MAKECMDGOALS),clean_dep)
 ifneq ($(MAKECMDGOALS),clean)
-include $(DEPS)
+-include $(DEPS)
 endif
 endif
 
-clean_dep: clean
-	rm -f $(DEPS) 
+update_dep:
+	@rm -f $(DEPS) 
+
+clean_dep: clean update_dep
+
 
 
 

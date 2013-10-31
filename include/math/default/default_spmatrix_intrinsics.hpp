@@ -178,11 +178,34 @@ namespace CGF{
     }
 
     template<int N, class T>
+    inline void spmatrix_block_column_sum_reduce(T r[N*N], const T a[N*N]){
+      for(uint j=0;j<N;j++){
+	T sum = 0;
+	for(uint i=0;i<N;i++){
+	  sum += a[i*N + j];
+	  r[i*N + j] = 0;
+	}
+	r[N*(N-1)+j] = sum;
+      }      
+    }
+
+    template<int N, class T>
     inline void spmatrix_block_vector_mul(T r[N*N], const T a[N*N], 
 					  const T v[N]){
       for(uint j=0;j<N;j++){
 	for(uint i=0;i<N;i++){
 	  r[j*N + i] = a[j*N + i] * v[i]; 
+	}
+      }
+    }
+
+    template<int N, class T>
+    inline void spmatrix_block_vector_mul_transpose(T r[N*N], 
+						    const T a[N*N],
+						    const T v[N]){
+      for(uint j=0;j<N;j++){
+	for(uint i=0;i<N;i++){
+	  r[j*N + i] = a[j*N + i] * v[j]; 
 	}
       }
     }
@@ -194,6 +217,17 @@ namespace CGF{
       for(uint j=0;j<N;j++){
 	for(uint i=0;i<N;i++){
 	  r[j*N + i] = a[j*N + i] + b[j*N + i] * v[i]; 
+	}
+      }      
+    }
+
+    template<int N, class T>
+    inline void spmatrix_block_vmadd_transpose(T r[N*N], const T a[N*N],
+					       const T b[N*N],
+					       const T v[N]){
+      for(uint j=0;j<N;j++){
+	for(uint i=0;i<N;i++){
+	  r[j*N + i] = a[j*N + i] + b[j*N + i] * v[j]; 
 	}
       }      
     }

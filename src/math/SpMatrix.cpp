@@ -211,7 +211,7 @@ namespace CGF{
 			     block_indices(0), comp_col_indices(0),
 			     row_lengths(0), allocated_length(0), blocks(0),
 			     n_allocated_blocks(0), n_blocks(0),
-			     n_elements(0), /*task(0), pool(0),*/ finalized(false){
+			     n_elements(0), /*task(0), pool(0),*/ finalized(false), tBlocks(0){
   }
 
   template<int N, class T>
@@ -222,7 +222,7 @@ namespace CGF{
 					   blocks(0),
 					   n_allocated_blocks(0), n_blocks(0),
 					   n_elements(0), /*task(0), pool(0),*/
-					   finalized(false){
+					   finalized(false), tBlocks(0){
     //size = w;
     origWidth = w;
     origHeight = h;
@@ -922,6 +922,44 @@ namespace CGF{
     }
   }
 
+  /*Transposed multiplication*/
+  template<int N, class T>
+  void spmv_t(Vector<T>& r, const SpMatrix<N, T>& m, const Vector<T>& v){
+    cgfassert(m.getHeight() == v.getSize());
+    cgfassert(r.getSize()  == m.getWidth());
+    cgfassert(m.finalized  == true);
+
+    /*Clear tmp_data*/
+    for(uint i=0;i<m.width/N;i++){
+      m.tBlocks[i].clear();
+    }
+
+    uint idx = 0;
+    /*Number of block rows*/
+    uint n_rows = m.height/N;
+    
+    const T* data = v.data;
+    
+    for(uint i=0;i<n_rows;i++){      
+      uint row_length = m.row_lengths[i];      
+      for(uint j=0;j<row_length;j++, idx++){
+	int blockIndex = m.comp_col_indices[idx]/N;
+	m.tBlocks[blockIndex].vectorMulAddTranspose(&(m.blocks[idx]),
+						    &(data[i*N]));
+      }
+    }
+
+    /*Column reduce*/
+    for(uint i=0;i<m.width/N;i++){
+      m.tBlocks[i].columnSumReduce();
+    }
+
+    for(uint i=0;i<m.width/N;i++){
+      for(uint j=0;j<N;j++){
+	r.data[i*N+j] = m.tBlocks[i].m[N*(N-1) + j];
+      }	
+    }
+  }
 
   /*Performs a partial sparse matrix vector
     multiplication. I.e. performs the multiplication such that the
@@ -1087,6 +1125,17 @@ namespace CGF{
   //template void spmv(Vector& r, const SpMatrix<16, float>& m,
   //	     const Vector& v);
 
+  template void spmv_t(Vector<float>& r, const SpMatrix<1, float>& m,
+		       const Vector<float>& v);
+  template void spmv_t(Vector<float>& r, const SpMatrix<2, float>& m,
+		       const Vector<float>& v);
+  template void spmv_t(Vector<float>& r, const SpMatrix<4, float>& m,
+		       const Vector<float>& v);
+  template void spmv_t(Vector<float>& r, const SpMatrix<8, float>& m,
+		       const Vector<float>& v);
+  //template void spmv_t(Vector& r, const SpMatrix<16, float>& m,
+  //	     const Vector& v);
+
 #if 0
   template void spmv_parallel(Vector<float>& r, const SpMatrix<1, float>& m,
 				const Vector<float>& v);
@@ -1120,6 +1169,18 @@ namespace CGF{
   template void spmv(Vector<double>& r, const SpMatrix<8, double>& m,
 		     const Vector<double>& v);
   //template void spmv(Vector& r, const SpMatrix<16, float>& m,
+  //	     const Vector& v);
+
+
+  template void spmv_t(Vector<double>& r, const SpMatrix<1, double>& m,
+		       const Vector<double>& v);
+  template void spmv_t(Vector<double>& r, const SpMatrix<2, double>& m,
+		       const Vector<double>& v);
+  template void spmv_t(Vector<double>& r, const SpMatrix<4, double>& m,
+		       const Vector<double>& v);
+  template void spmv_t(Vector<double>& r, const SpMatrix<8, double>& m,
+		       const Vector<double>& v);
+  //template void spmv_t(Vector& r, const SpMatrix<16, float>& m,
   //	     const Vector& v);
 
 #if 0

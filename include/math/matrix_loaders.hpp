@@ -29,6 +29,9 @@ namespace CGF{
   template<int N, class T>
   class SpMatrix;
 
+  template<int N, class T>
+  class SpMatrixC2;
+
   template<class T>
   class Vector;
   
@@ -44,6 +47,9 @@ namespace CGF{
 
   template<int N, class T>
   bool save_matrix_matlab(const char* filename, const SpMatrix<N, T>* const mat);
+
+  template<int N, class T>
+  bool save_matrix_matlab(const char* filename, const SpMatrixC2<N, T>* const mat);
   
   template<int N, class T>
   SpMatrix<N, T>* load_matrix_matlab(const char* filename);

@@ -218,6 +218,10 @@ namespace CGF{
 		       const Vector<TT>& v);
 
     template<int M, class TT>
+      friend void spmv_t(Vector<TT>& r, const SpMatrix<M, TT>& m, 
+			 const Vector<TT>& v);
+
+    template<int M, class TT>
       friend void spmv_parallel(Vector<TT>& r, const SpMatrix<M, TT>& m, 
 				const Vector<TT>& v);
 
@@ -243,6 +247,14 @@ namespace CGF{
     void finalize(){
       if(!finalized){
 	reorderBlocks();
+
+	/*Allocate new temp buffer for spmv_t*/
+	if(tBlocks){
+	  delete[]tBlocks;
+	}
+
+	tBlocks = new SpMatrixBlock<N, T>[width/N];
+
 	finalized = true;
       }
     }
@@ -337,6 +349,10 @@ namespace CGF{
     bool finalized;          /*True if the matrix is finalized. If the
 			       matrix is altered after finalization,
 			       this value becomes false*/
+
+    SpMatrixBlock<N, T>* tBlocks; /*Temporary buffer for storing the
+				    intermediate results for a
+				    transposed multiplication*/
 #if 0
     CSVExporter* exporter;   /*Exporter*/
     uint bandwidth;
@@ -348,6 +364,9 @@ namespace CGF{
 
   template<int N, class T>
   void spmv(Vector<T>& r, const SpMatrix<N, T>& m, const Vector<T>& v);
+
+  template<int N, class T>
+  void spmv_t(Vector<T>& r, const SpMatrix<N, T>& m, const Vector<T>& v);
 
   template<int N, class T>
   void spmv_partial(Vector<T>& r, const SpMatrix<N, T>& m, 

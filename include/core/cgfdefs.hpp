@@ -99,6 +99,13 @@ namespace CGF{
     *b = tmp;
   }
 
+  template<class T>
+  void swap(T* a, T* b){
+    T tmp = *a;
+    *a = *b;
+    *b = tmp;
+  }
+
   /*Shortcut macros*/
 #ifdef _DEBUG
 #define PRINT_FUNCTION message("%s", __PRETTY_FUNCTION__);

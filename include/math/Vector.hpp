@@ -208,6 +208,8 @@ namespace CGF{
       friend Vector<U> operator*(const SpMatrix<M, U>& m, const Vector<U>& v);
     template<int M, class U>
       friend void spmv(Vector<U>& r, const SpMatrix<M, U>& m, const Vector<U>& v);
+    template<int M, class U>
+      friend void spmv_t(Vector<U>& r, const SpMatrix<M, U>& m, const Vector<U>& v);
 
     template<class U>
       friend void spmv(Vector<U>& r, const BlockDiagMatrix& m, const Vector<U>& v);

@@ -82,7 +82,7 @@ namespace CGF{
     void unblock()const;             /*Continues the blocked
 				       threads. This function should
 				       be called from the main thread
-				       since all chikd threads are
+				       since all child threads are
 				       blocked*/
 
   protected:

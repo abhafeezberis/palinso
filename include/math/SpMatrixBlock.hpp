@@ -73,9 +73,13 @@ namespace CGF{
 
     /*reduceAllRows to a singular value using the sum operator*/
     void rowSumReduce();
+    void columnSumReduce();
     void vectorMul   (const T* const vec);
     void vectorMulAdd(const SpMatrixBlock<N,T>*const mat, 
 		      const T* const vec);
+    void vectorMulTranspose   (const T* const vec);
+    void vectorMulAddTranspose(const SpMatrixBlock<N,T>*const mat, 
+			       const T* const vec);
     
     SpMatrixBlock<N,T>& operator=(const SpMatrixBlock<N,T>& mat);
 
@@ -366,6 +370,11 @@ namespace CGF{
   }
 
   template<int N, class T>
+  inline void SpMatrixBlock<N, T>::columnSumReduce(){
+    spmatrix_block_column_sum_reduce<N, T>(m, m);
+  }
+
+  template<int N, class T>
   inline void SpMatrixBlock<N, T>::vectorMul(const T* const vec){
     spmatrix_block_vector_mul<N, T>(m, m, vec);
   }
@@ -374,6 +383,17 @@ namespace CGF{
   inline void SpMatrixBlock<N, T>::vectorMulAdd(const SpMatrixBlock<N, T>*const mat,
 					     const T* const vec){
     spmatrix_block_vmadd<N, T>(m, m, mat->m, vec);
+  }
+
+  template<int N, class T>
+  inline void SpMatrixBlock<N, T>::vectorMulTranspose(const T* const vec){
+    spmatrix_block_vector_mul_transpose<N, T>(m, m, vec);
+  }
+
+  template<int N, class T>
+  inline void SpMatrixBlock<N, T>::vectorMulAddTranspose(const SpMatrixBlock<N, T>*const mat,
+					     const T* const vec){
+    spmatrix_block_vmadd_transpose<N, T>(m, m, mat->m, vec);
   }
 
   template<int N, class T>

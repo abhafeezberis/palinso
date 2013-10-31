@@ -21,7 +21,6 @@
    SOFTWARE. */
 
 #include "math/matrix_loaders.hpp"
-#include "math/SpMatrix.hpp"
 #include "math/Vector.hpp"
 #include <iostream>
 #include <fstream>

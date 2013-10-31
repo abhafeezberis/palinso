@@ -25,9 +25,7 @@ include $(SHARED_PATH)/Makefile
 COBJ	+= $(CGF_LIB)
 
 #Include some other shared libraries
-#LIBS	+= -lGLEW -lSDL -lftgl
-LIBS 	+= $(CUDA_LIBS) -lpthread -lcublas
-#CCFLAGS +=	-I/usr/include/freetype2
+LIBS 	+= $(CUDA_LIBS) -lpthread
 ###########################################################################
 #Define some project specific rules
 

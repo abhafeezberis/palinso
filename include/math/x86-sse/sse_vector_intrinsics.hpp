@@ -125,57 +125,59 @@ namespace CGF{
       _mm_store_ps(r, XMM0);
     }
 
+    static const __m128 cones = {1, 1, 1, 1};
+    
     inline void vector4_eq(float r[4], const float a[4], const float b[4]){
       __m128 XMM0 = _mm_load_ps(a);
       __m128 XMM1 = _mm_load_ps(b);
-      __m128 XMM8 = _mm_set_ps1(1.0f);
+      //__m128 XMM8 = _mm_set_ps1(1.0f);
       
-      XMM0 = _mm_and_ps(_mm_cmpeq_ps(XMM0, XMM1), XMM8);
+      XMM0 = _mm_and_ps(_mm_cmpeq_ps(XMM0, XMM1), cones);
       _mm_store_ps(r, XMM0);
     }
 
     inline void vector4_neq(float r[4], const float a[4], const float b[4]){
       __m128 XMM0 = _mm_load_ps(a);
       __m128 XMM1 = _mm_load_ps(b);
-      __m128 XMM8 = _mm_set_ps1(1.0f);
+      //__m128 XMM8 = _mm_set_ps1(1.0f);
       
-      XMM0 = _mm_and_ps(_mm_cmpneq_ps(XMM0, XMM1), XMM8);
+      XMM0 = _mm_and_ps(_mm_cmpneq_ps(XMM0, XMM1), cones);
       _mm_store_ps(r, XMM0);
     }
 
     inline void vector4_lt(float r[4], const float a[4], const float b[4]){
       __m128 XMM0 = _mm_load_ps(a);
       __m128 XMM1 = _mm_load_ps(b);
-      __m128 XMM8 = _mm_set_ps1(1.0f);
+      //__m128 XMM8 = _mm_set_ps1(1.0f);
       
-      XMM0 = _mm_and_ps(_mm_cmplt_ps(XMM0, XMM1), XMM8);
+      XMM0 = _mm_and_ps(_mm_cmplt_ps(XMM0, XMM1), cones);
       _mm_store_ps(r, XMM0);
     }
 
     inline void vector4_le(float r[4], const float a[4], const float b[4]){
       __m128 XMM0 = _mm_load_ps(a);
       __m128 XMM1 = _mm_load_ps(b);
-      __m128 XMM8 = _mm_set_ps1(1.0f);
+      //__m128 XMM8 = _mm_set_ps1(1.0f);
       
-      XMM0 = _mm_and_ps(_mm_cmple_ps(XMM0, XMM1), XMM8);
+      XMM0 = _mm_and_ps(_mm_cmple_ps(XMM0, XMM1), cones);
       _mm_store_ps(r, XMM0);
     }
 
     inline void vector4_gt(float r[4], const float a[4], const float b[4]){
       __m128 XMM0 = _mm_load_ps(a);
       __m128 XMM1 = _mm_load_ps(b);
-      __m128 XMM8 = _mm_set_ps1(1.0f);
+      //__m128 XMM8 = _mm_set_ps1(1.0f);
       
-      XMM0 = _mm_and_ps(_mm_cmpgt_ps(XMM0, XMM1), XMM8);
+      XMM0 = _mm_and_ps(_mm_cmpgt_ps(XMM0, XMM1), cones);
       _mm_store_ps(r, XMM0);
     }
 
     inline void vector4_ge(float r[4], const float a[4], const float b[4]){
       __m128 XMM0 = _mm_load_ps(a);
       __m128 XMM1 = _mm_load_ps(b);
-      __m128 XMM8 = _mm_set_ps1(1.0f);
+      //__m128 XMM8 = _mm_set_ps1(1.0f);
       
-      XMM0 = _mm_and_ps(_mm_cmpge_ps(XMM0, XMM1), XMM8);
+      XMM0 = _mm_and_ps(_mm_cmpge_ps(XMM0, XMM1), cones);
       _mm_store_ps(r, XMM0);
     }
     

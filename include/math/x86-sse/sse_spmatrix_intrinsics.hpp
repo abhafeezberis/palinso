@@ -1152,6 +1152,11 @@ namespace CGF{
     }
 
     template<int N, class T>
+    inline void spmatrix_block_column_sum_reduce(T r[N*N], const T a[N*N]){
+      default_proc::spmatrix_block_column_sum_reduce<N, T>(r, a);
+    }
+
+    template<int N, class T>
     inline void spmatrix_block_vector_mul(T r[N*N], const T a[N*N],
 					  const T v[N]){
       default_proc::spmatrix_block_vector_mul<N, T>(r, a, v);
@@ -1291,6 +1296,13 @@ namespace CGF{
       }
     }
 
+    template<int N, class T>
+    inline void spmatrix_block_vector_mul_transpose(T r[N*N], const T a[N*N],
+						    const T v[N]){
+      default_proc::spmatrix_block_vector_mul_transpose<N, T>(r, a, v);
+    }
+
+    /*r = a+b*v*/
     template<int N, class T>
     inline void spmatrix_block_vmadd(T r[N*N], const T a[N*N],
 				     const T b[N*N],
@@ -1443,6 +1455,14 @@ namespace CGF{
 	_mm_store_ps(r + i*64 + 56, _mm_add_ps(_mm_mul_ps(XMM2, XMM6),XMM22));
 	_mm_store_ps(r + i*64 + 60, _mm_add_ps(_mm_mul_ps(XMM3, XMM7),XMM23));
       }    
+    }
+
+    /*r = a+b'*v*/
+    template<int N, class T>
+    inline void spmatrix_block_vmadd_transpose(T r[N*N], const T a[N*N],
+					       const T b[N*N],
+					       const T v[N]){
+      default_proc::spmatrix_block_vmadd_transpose<N, T>(r, a, b, v);
     }
 
     template<int N, class T>
