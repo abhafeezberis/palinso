@@ -149,10 +149,10 @@ touchdep: $(DEPS)
 #Rule for linking main executable
 # $(CUBIN) #$(CUPTX) #$(ASM)
 ifeq ($(DEBUG),1)
-_main:	update_dep $(DEPS) $(OBJ)
+_main:	$(DEPS) $(OBJ) update_dep
 	$(CC) -o $(EXE) $(COBJ) $(LIBS)
 else
-_main:	update_dep $(DEPS) $(OBJ)
+_main:	$(DEPS) $(OBJ) update_dep
 	$(CC) -o $(EXE) $(COBJ) $(LIBS) -Wl,-s -Wl,--gc-sections
 endif
 #
@@ -195,7 +195,7 @@ endif
 endif
 
 update_dep:
-	@rm -f $(DEPS) 
+	@rm -f $(DEPS)
 
 clean_dep: clean update_dep
 
