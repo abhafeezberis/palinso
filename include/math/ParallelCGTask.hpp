@@ -7,10 +7,10 @@
    modify, merge, publish, distribute, sublicense, and/or sell copies
    of the Software, and to permit persons to whom the Software is
    furnished to do so, subject to the following conditions:
-   
+
    The above copyright notice and this permission notice shall be
    included in all copies or substantial portions of the Software.
-   
+
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -34,13 +34,13 @@ namespace CGF{
 
   template<int N, class T>
   class CGFAPI SpMatrix;
-  
+
   template<int N, class T>
   class CGFAPI ParallelCGTask : public Task{
   public:
-    ParallelCGTask(const uint n_threads, Vector<T>* const x, 
-		   const SpMatrix<N, T>* const mat, 
-		   const Vector<T>* const b);
+    ParallelCGTask(const int n_threads, Vector<T>* const x,
+                   const SpMatrix<N, T>* const mat,
+                   const Vector<T>* const b);
     virtual ~ParallelCGTask();
 
     virtual void execute(const Thread* caller);
@@ -54,7 +54,7 @@ namespace CGF{
       tolerance = tol;
     }
 
-    void setMaxIterations(uint steps){
+    void setMaxIterations(int steps){
       maxIterations = steps;
     }
 
@@ -77,19 +77,21 @@ namespace CGF{
     T* reductions1;
     T* reductions2;
     T* reductions3;
+
     //double alpha, beta;
     //double divider;
     //double residual;
     //double s;
-    
+
     VectorRange* vRange;
     MatrixRange* mRange;
-    uint* n_blocks;
+    int* n_blocks;
     BenchmarkTimer* timers;
-    uint* k;
+    int* k;
 
     T tolerance;
-    uint maxIterations;
+    int maxIterations;
+    T bnorm;
   };
 }
 

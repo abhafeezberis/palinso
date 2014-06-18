@@ -1,31 +1,31 @@
-#Master MAKEFILE 
+#Master MAKEFILE
 
 #Defines some general rules for compiling C, C++ and CUDA programs
 #This master MAKEFILE is included in a local, project specific
 #Makefile, which defines some paths and local rules
 
-#Making with NOCUDA=1 prevents from compiling CUDA code and including
+#Making with CUDA=0 prevents from compiling CUDA code and including
 #CUDA startup code for projects which do not depend on CUDA
 
-NOCUDA	= 0
+CUDA	= 1
 NOSSE2	= 0
-NOSDL   = 1
+NOSDL   = 0
 DEBUG   = 0
 
 #QT Library stuff
 MOC4			= moc-qt4
 ifeq ($(DEBUG),1)
-STRIP_FLAGS		= 
-COMPILATION_FLAGS       = -O0 -g -D_DEBUG
+STRIP_FLAGS		=
+COMPILATION_FLAGS       = -O0 -g -D_DEBUG -DUSE_THREADS
 else
-STRIP_FLAGS		= -ffunction-sections -fdata-sections 
-COMPILATION_FLAGS       = -O4 -DN_DEBUG 
+STRIP_FLAGS		= -ffunction-sections -fdata-sections
+COMPILATION_FLAGS       = -O4 -DN_DEBUG -DUSE_THREADS
 endif
 
 ifeq ($(NOCUDA),1)
 #CUDA_LIBS		=
 else
-CUDA_LIBS		= -lcudart 
+CUDA_LIBS		= -lcudart
 endif
 
 ifeq ($(NOSDL),1)
@@ -41,10 +41,10 @@ CGF_INCLUDE_PATH	= $(CGF_INSTALL_PATH)/include
 #CGF_LIB			= $(CGF_LIB_PATH)/cgf.a
 #CGF_DEBUG_LIB		= $(CGF_LIB_PATH)/cgfd.a
 
-BENCHMARK		= -DN_BENCHMARK	
+BENCHMARK		= -DN_BENCHMARK
 
 #Compiler flags
-INCLUDES	+= -I./include -I$(CGF_INCLUDE_PATH) 
+INCLUDES	+= -I./include -I$(CGF_INCLUDE_PATH)
 
 ifeq ($(NOSSE2),1)
 SSE2	:=
@@ -52,27 +52,29 @@ else
 SSE2	:= -DSSE2
 endif
 
-CCFLAGS := $(INCLUDES) -Wall -Werror $(COMPILATION_FLAGS) $(STRIP_FLAGS) -DUNIX $(GPU) -D_REENTRANT -ansi $(SSE2) $(BENCHMARK) $(SDL)
+CCFLAGS := $(INCLUDES) -Wall -Werror -Wclobbered -Wempty-body -Wignored-qualifiers -Wmissing-field-initializers -Wsign-compare -Wsign-conversion -Wconversion -Wtype-limits -Wuninitialized $(COMPILATION_FLAGS) $(STRIP_FLAGS) -DUNIX $(GPU) -D_REENTRANT -ansi $(SSE2) $(BENCHMARK) $(SDL)
 
 #CUDA Compiler flags
-ifeq ($(NOCUDA),1)
-NVCCFLAGS	=
-CCFLAGS		+= -DNO_CUDA	
-else
-NVCCFLAGS	+= -Xcompiler "" $(INCLUDES) -DCUDA -DUNIX $(DGPU) $(COMPILATION_FLAGS) -arch sm_13 $(BENCHMARK) 
+ifeq ($(CUDA),1)
+NVCCFLAGS	+= -Xcompiler "-Wsign-compare -Wconversion -Wall -Werror" --compiler-bindir="/usr/bin/g++-4.8" $(INCLUDES) -DCUDA -DUNIX $(DGPU) $(COMPILATION_FLAGS) -arch sm_13 $(BENCHMARK)
 CCFLAGS		+= -DCUDA
+else
+NVCCFLAGS	=
+CCFLAGS		+= -DNO_CUDA
 endif
 
 #Link against these libraries
-LIBS 	:= 
+LIBS 	:=
+
+LIB_PATH :=
 
 #Compilers
 CC 	= g++
 CPP	= g++
-ifeq ($(NOCUDA),1)
-NVCC	=
-else
+ifeq ($(CUDA),1)
 NVCC	= nvcc
+else
+NVCC	=
 endif
 
 #Default seachpath for MAKE
@@ -85,21 +87,21 @@ CCFILES	:= $(wildcard $(patsubst %, %/*.cpp, $(MODULES)))
 CUFILES	:= $(wildcard $(patsubst %, %/*.cu, $(MODULES)))
 HPPFILES:= $(wildcard $(patsubst %, %/*.hpp, include))
 
-#Create a list of object ande dependency files
-ifeq ($(NOCUDA),1)
-OBJ	:= $(CFILES:.c=.o) $(CCFILES:.cpp=.o)
-else
+#Create a list of object and dependency files
+ifeq ($(CUDA),1)
 OBJ	:= $(CFILES:.c=.o) $(CCFILES:.cpp=.o) $(CUFILES:.cu=.o)
+else
+OBJ	:= $(CFILES:.c=.o) $(CCFILES:.cpp=.o)
 endif
 
 DEPS 	:= $(OBJ:.o=.dep)
 COBJ	+= $(OBJ)
-ifeq ($(NOCUDA),1)
-CUBIN	:= 
-CUPTX	:=
-else
+ifeq ($(CUDA),1)
 CUBIN	:= $(CUFILES:.cu=.cubin)
-CUPTX 	:= $(CUFILES:.cu=.ptx)
+CUPTX	:= $(CUFILES:.cu=.ptx)
+else
+CUBIN	:=
+CUPTX 	:=
 endif
 
 ASM     := $(CCFILES:.cpp=.s)
@@ -111,7 +113,7 @@ TEMPFILES += $(HPPFILES:.hpp=.hpp~)
 
 #Rules for compiling different files
 %.o:	%.c
-	$(CC) $(CCFLAGS) -c $< -o $@ 
+	$(CC) $(CCFLAGS) -c $< -o $@
 
 %.o:	%.cpp
 	$(CPP) $(CCFLAGS) -c $< -o $@
@@ -119,41 +121,41 @@ TEMPFILES += $(HPPFILES:.hpp=.hpp~)
 %.s:	%.cpp
 	$(CPP) $(CCFLAGS) -S $< -o $@
 
-ifeq ($(NOCUDA),1)
-
-else
+ifeq ($(CUDA),1)
 %.o:	%.cu
-	$(NVCC) -o $@ -c  $< $(NVCCFLAGS) 
+	$(NVCC) -o $@ -c  $< $(NVCCFLAGS)
+else
+
 endif
 
 %.moc:	%.hpp
 	$(MOC4) -o $(^D)/$@ $<
 
-ifeq ($(NOCUDA),1)
-
-else
+ifeq ($(CUDA),1)
 %.cubin:	%.cu
-	$(NVCC) -o $@ $< $(NVCCFLAGS) --cubin 
+	$(NVCC) -o $@ $< $(NVCCFLAGS) --cubin
 
 %.ptx:	%.cu
-	$(NVCC) -o $@ $< $(NVCCFLAGS) --ptx 
+	$(NVCC) -o $@ $< $(NVCCFLAGS) --ptx
+else
+
 endif
 
 nocuda:
 	@echo $(NVCCFLAGS)
 	@echo $(NVCC)
 
-touchdep: $(DEPS) 
+touchdep: $(DEPS)
 	@touch $(DEPS)
 
 #Rule for linking main executable
 # $(CUBIN) #$(CUPTX) #$(ASM)
 ifeq ($(DEBUG),1)
 _main:	$(DEPS) $(OBJ) update_dep
-	$(CC) -o $(EXE) $(COBJ) $(LIBS)
+	$(CC) -o $(EXE) $(COBJ) $(LIB_PATH) $(LIBS)
 else
 _main:	$(DEPS) $(OBJ) update_dep
-	$(CC) -o $(EXE) $(COBJ) $(LIBS) -Wl,-s -Wl,--gc-sections
+	$(CC) -o $(EXE) $(COBJ) $(LIB_PATH) $(LIBS) -Wl,-s -Wl,--gc-sections
 endif
 #
 
@@ -170,23 +172,23 @@ debug_lib: $(DEPS) $(OBJ) $(CUBIN)
 
 #Rules for creating dependencies
 %.dep: 	%.c
-	@./$(SHARED_PATH)/dep.sh `dirname $*.c` $(CCFLAGS) $*.c > $@	
+	@./$(SHARED_PATH)/dep.sh `dirname $*.c` $(CCFLAGS) $*.c > $@
 
 %.dep: 	%.cpp
-	@./$(SHARED_PATH)/dep.sh `dirname $*.cpp` $(CCFLAGS) $*.cpp > $@	
+	@./$(SHARED_PATH)/dep.sh `dirname $*.cpp` $(CCFLAGS) $*.cpp > $@
 
-ifeq ($(NOCUDA),1)
-
-else
+ifeq ($(CUDA),1)
 %.dep: 	%.cu
-	@./$(SHARED_PATH)/nvdep.sh `dirname $*.cu` $(NVCCFLAGS) $*.cu > $@	
+	@./$(SHARED_PATH)/nvdep.sh `dirname $*.cu` $(NVCCFLAGS) $*.cu > $@
+else
+
 endif
 #	$(NVCC) -M $(NVCCFLAGS) $< > $@
 
 .PHONY: clean
 #Clean up
 clean:
-	rm -f $(OBJ) *.linkinfo include/.version.hpp include/.lversion.hpp $(CUBIN) $(CUPTX) $(ASM) $(MOCS) $(TEMPFILES) Makefile~ 
+	rm -f $(OBJ) *.linkinfo include/.version.hpp include/.lversion.hpp $(CUBIN) $(CUPTX) $(ASM) $(MOCS) $(TEMPFILES) Makefile~
 
 ifneq ($(MAKECMDGOALS),clean_dep)
 ifneq ($(MAKECMDGOALS),clean)

@@ -22,11 +22,10 @@
 
 #ifndef CUDAVECTOR_HPP
 #define CUDAVECTOR_HPP
+
 #ifdef CUDA
 
 #include "math/CObject.hpp"
-#include "util/cuda_util.hpp"
-#include <cuda_runtime.h>
 #include "core/Thread.hpp"
 
 namespace CGF{
@@ -35,16 +34,19 @@ namespace CGF{
   class Vector;
 
   template<class T>
-  void bindTexture(T* d_array, uint size);
+  void bindTexture(T* d_array, int size);
 
   template<class T>
-  void bindTexture2(T* d_array, uint size);
+  void bindTexture2(T* d_array, int size);
 
-  void bindUIntTexture(uint* d_array, uint size);
-  void bindUIntTexture2(uint* d_array, uint size);
+  void bindUIntTexture(uint* d_array, int size);
+  void bindUIntTexture2(uint* d_array, int size);
+
+  void bindIntTexture(int* d_array, int size);
+  void bindIntTexture2(int* d_array, int size);
 
   template<class T>
-  void bindFloatBlockTexture(T* d_array, uint size);
+  void bindFloatBlockTexture(T* d_array, int size);
 
   void unbindTexture();
 
@@ -52,9 +54,9 @@ namespace CGF{
   class CVector : public CObject{
   public:
     CVector(const Vector<T>* vector, const ThreadPool* pool = 0, 
-	    bool copy=false);
+            bool copy=false);
     CVector(const CVector<T>* vector);
-    CVector(ulong size = 0, const ThreadPool* pool = 0, bool copy=false);
+    CVector(int size = 0, const ThreadPool* pool = 0, bool copy=false);
 
     virtual ~CVector();
 
@@ -65,18 +67,18 @@ namespace CGF{
     
     void print(const Thread* caller);
 
-    T* getData(uint i){
+    T* getData(int i){
       return d_data[i];
     }
 
-    const T* getData(uint i)const{
+    const T* getData(int i)const{
       return d_data[i];
     }
 
     T* getData(const Thread* caller){
       int tid = 0;
       if(caller){
-	tid = caller->getId();
+        tid = caller->getId();
       }
       return d_data[tid];
     }
@@ -84,25 +86,25 @@ namespace CGF{
     const T* getData(const Thread* caller)const{
       int tid = 0;
       if(caller){
-	tid = caller->getId();
+        tid = caller->getId();
       }
       return d_data[tid];
     }
 
-    T* getMappedData(uint i){
+    T* getMappedData(int i){
       cgfassert(copy);
       return d_mapped[i];
     }
 
-    const T* getMappedData(uint i)const{
+    const T* getMappedData(int i)const{
       cgfassert(copy);
       return d_mapped[i];
     }
 
     T sum(const Thread* caller = 0)const;
 
-    ulong getSize()const{return origSize;}
-    ulong getPaddedSize()const{return size;}
+    int getSize()const{return origSize;}
+    int getPaddedSize()const{return size;}
 
     void set(const Vector<T>* vec);
     void setReductionBuffer(CVector<T>* vec);
@@ -116,8 +118,8 @@ namespace CGF{
     void setDefaultRange();
     void allocateHostMemory();
     const Vector<T>* const vec;
-    ulong size;
-    ulong origSize;
+    int size;
+    int origSize;
     bool  copy;
     T** d_data;
     T** d_mapped;
@@ -128,7 +130,7 @@ namespace CGF{
     cudaStream_t* streams;
     template<int N, class U>
     friend class CSpMatrix;
-    ulong textureSize;
+    int textureSize;
   };
 }
 

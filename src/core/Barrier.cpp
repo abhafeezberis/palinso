@@ -24,6 +24,7 @@
 #include "core/ThreadPool.hpp"
 
 namespace CGF{
+#ifdef USE_THREADS
   Barrier::Barrier(ThreadPool* p){
     n_shared_threads = p->getSize();
     pool = p;
@@ -32,7 +33,7 @@ namespace CGF{
     pthread_cond_init(&block_cond, NULL);
 
 #ifdef PBARRIER
-    pthread_barrier_init(&bar, NULL, n_shared_threads);
+    pthread_barrier_init(&bar, NULL, (uint)n_shared_threads);
 #else
     block_status = 0;
     pthread_mutex_init(&mutex, NULL);
@@ -67,4 +68,5 @@ namespace CGF{
     pthread_cond_broadcast(&block_cond);
     pthread_mutex_unlock(&block_mutex);
   }
+#endif
 }

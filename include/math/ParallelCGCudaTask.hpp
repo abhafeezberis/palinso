@@ -22,9 +22,10 @@
 
 #ifndef PARALLELCGCUDATASK_HPP
 #define PARALLELCGCUDATASK_HPP
+
 #ifdef CUDA
+
 #include "math/Math.hpp"
-#include <cuda_runtime.h>
 #include "core/Task.hpp"
 #include "math/CUDASpmv.hpp"
 
@@ -46,9 +47,9 @@ namespace CGF{
   class CGFAPI ParallelCGCudaTask : public Task{
   public:
     ParallelCGCudaTask(const ThreadPool* pool, Vector<T>* const x, 
-		       const SpMatrix<N, T>* const mat, 
-		       const Vector<T>* const b, int n_thr=256, 
-		       TextureOperation tex = TexVector);
+                       const SpMatrix<N, T>* const mat, 
+                       const Vector<T>* const b, int n_thr=256, 
+                       TextureOperation tex = TexVector);
     virtual ~ParallelCGCudaTask();
 
     virtual void execute(const Thread* caller);
@@ -66,7 +67,7 @@ namespace CGF{
     void setTolerance(T tol){
       tolerance = tol;
     }
-    void setMaxIterations(uint steps){
+    void setMaxIterations(int steps){
       maxIterations = steps;
     }
 
@@ -96,12 +97,13 @@ namespace CGF{
     Vector<T>* C;
 
     BenchmarkTimer* timers;
-    uint* k;
+    int* k;
 
     int n_cuda_threads;
     TextureOperation texture;
     T tolerance;
-    uint maxIterations;
+    int maxIterations;
+    T bnorm;
   };
 }
 

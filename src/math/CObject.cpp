@@ -34,8 +34,8 @@ namespace CGF{
 
     mRange     = new MatrixRange[n_devices];
     vRange     = new VectorRange[n_devices];
-    n_blocks   = new uint[n_devices];
-    startBlock = new uint[n_devices];
+    n_blocks   = new int[n_devices];
+    startBlock = new int[n_devices];
   }
 
   CObject::~CObject(){
@@ -49,17 +49,17 @@ namespace CGF{
     return pool;
   }
 
-  uint CObject::getNDevices()const{
+  int CObject::getNDevices()const{
     return n_devices;
   }
   
   void CObject::setMRanges(const MatrixRange* range){
-    for(uint i=0;i<n_devices;i++){
+    for(int i=0;i<n_devices;i++){
       mRange[i] = range[i];
     }
   }
 
-  const MatrixRange* CObject::getMRange(uint i)const{
+  const MatrixRange* CObject::getMRange(int i)const{
     return &(mRange[i]);
   }
 
@@ -68,12 +68,12 @@ namespace CGF{
   }
 
   void CObject::setVRanges(const VectorRange* range){
-    for(uint i=0;i<n_devices;i++){
+    for(int i=0;i<n_devices;i++){
       vRange[i] = range[i];
     }
   }
 
-  const VectorRange* CObject::getVRange(uint i)const{
+  const VectorRange* CObject::getVRange(int i)const{
     return &(vRange[i]);
   }
 
@@ -81,13 +81,13 @@ namespace CGF{
     return vRange;
   }
 
-  void CObject::setNBlocks(const uint* blocks){
-    for(uint i=0;i<n_devices;i++){
+  void CObject::setNBlocks(const int* blocks){
+    for(int i=0;i<n_devices;i++){
       n_blocks[i] = blocks[i];
     }
   }
 
-  const uint* CObject::getNBlocks()const{
+  const int* CObject::getNBlocks()const{
     return n_blocks;
   }
 

@@ -22,7 +22,11 @@
 
 #include "core/daemon.hpp"
 #include "core/cgfdefs.hpp"
+#ifdef _WIN32
+
+#else
 #include <unistd.h>
+#endif
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -62,6 +66,11 @@ namespace CGF{
     /*Redirect stderr*/
     sprintf(buffer, "%d.stderr.txt", getpid());
     freopen(buffer, "w", stderr);
+  }
+
+  void redirect_std_file_descriptors_null(){
+    freopen("/dev/null", "w", stdout);
+    freopen("/dev/null", "w", stderr);
   }
 
 }

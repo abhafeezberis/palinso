@@ -29,7 +29,7 @@
 namespace CGF{
   class Exception{
   public:
-    Exception(const uint l, const char* f, const char* m):
+    Exception(const int l, const char* f, const char* m):
       line(l), file(f), msg(m){
     };
     
@@ -37,24 +37,24 @@ namespace CGF{
     };
     virtual const std::string getError() const = 0;
   protected:
-    const uint line;
+    const int line;
     const char* file;
     const char* msg;
   };
-
+  
   class TimeOutException : public Exception{
   public:
-    TimeOutException(const uint l, const char* f, const char* m=0):
+    TimeOutException(const int l, const char* f, const char* m=0):
       Exception(l, f, m){
     };
     virtual ~TimeOutException(){
     };
     const std::string getError() const;
   };
-
+  
   class FileNotFoundException : public Exception{
   public:
-    FileNotFoundException(const uint l, const char* f, const char* m=0):
+    FileNotFoundException(const int l, const char* f, const char* m=0):
       Exception(l, f, m){
     };
     virtual ~FileNotFoundException(){
@@ -64,7 +64,7 @@ namespace CGF{
 
   class CUDAException : public Exception{
   public:
-    CUDAException(const uint l, const char* f, const char* m=0):
+    CUDAException(const int l, const char* f, const char* m=0):
       Exception(l, f, m){
     }
 
@@ -76,7 +76,7 @@ namespace CGF{
 
   class ThreadPoolException : public Exception{
   public:
-    ThreadPoolException(const uint l, const char* f, const char* m=0):
+    ThreadPoolException(const int l, const char* f, const char* m=0):
       Exception(l, f, m){
     }
     virtual ~ThreadPoolException(){
@@ -87,7 +87,7 @@ namespace CGF{
 
   class MathException : public Exception{
   public:
-    MathException(const uint l, const char* f, const char* m=0):
+    MathException(const int l, const char* f, const char* m=0):
       Exception(l, f, m){
     }
 
@@ -98,7 +98,7 @@ namespace CGF{
 
   class SolutionNotFoundException : public MathException{
   public:
-    SolutionNotFoundException(const uint l, const char* f, const char* m=0):
+    SolutionNotFoundException(const int l, const char* f, const char* m=0):
       MathException(l, f, m){
     }
     virtual ~SolutionNotFoundException(){}
@@ -108,7 +108,7 @@ namespace CGF{
 
   class AlgException : public Exception{
   public:
-    AlgException(const uint l, const char* f, const char* m = 0):
+    AlgException(const int l, const char* f, const char* m = 0):
       Exception(l, f, m){
     }
 
@@ -120,7 +120,7 @@ namespace CGF{
 
   class DegenerateCaseException : public AlgException{
   public:
-    DegenerateCaseException(const uint l, const char* f, const char* m = 0):
+    DegenerateCaseException(const int l, const char* f, const char* m = 0):
       AlgException(l, f, m){
     }
 

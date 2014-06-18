@@ -7,10 +7,10 @@
    modify, merge, publish, distribute, sublicense, and/or sell copies
    of the Software, and to permit persons to whom the Software is
    furnished to do so, subject to the following conditions:
-   
+
    The above copyright notice and this permission notice shall be
    included in all copies or substantial portions of the Software.
-   
+
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -21,8 +21,6 @@
    SOFTWARE. */
 
 #ifdef CUDA
-//#include <cuda.h>
-#include <cuda_runtime.h>
 #include "math/ParallelSPMVCudaTask.hpp"
 #include "core/Thread.hpp"
 #include "util/cuda_util.hpp"
@@ -39,17 +37,17 @@ namespace CGF{
 
 #define TOL 1e-8
   template<int N, class T>
-  ParallelSPMVCudaTask<N, T>::ParallelSPMVCudaTask(const ThreadPool* pool, 
-						   Vector<T>* const _x, 
-						   const SpMatrix<N, T>* const _mat, 
-						   const Vector<T>* const _b,
-						   int n_thr, 
-						   TextureOperation tex, 
-						   int d_offset)
+  ParallelSPMVCudaTask<N, T>::ParallelSPMVCudaTask(const ThreadPool* pool,
+                                                   Vector<T>* const _x,
+                                                   const SpMatrix<N, T>* const _mat,
+                                                   const Vector<T>* const _b,
+                                                   int n_thr,
+                                                   TextureOperation tex,
+                                                   int d_offset)
     : Task(pool->getSize()), x(_x), mat(_mat), b(_b), n_cuda_threads(n_thr), texture(tex), device_offset(d_offset){
 
     //init_cuda_host_thread();
-    
+
     cmat = new CSpMatrix<N, T>(_mat, n_cuda_threads, texture, pool);
     cmat->computeBlockDistribution();
 
@@ -79,7 +77,7 @@ namespace CGF{
 #if 0
   template<int N, class T>
   void ParallelSPMVCudaTask<N, T>::exportSummary(){
-    for(uint i=0;i<n_threads;i++){
+    for(int i=0;i<n_threads;i++){
       exporter->setValue("thread_id", i);
       exporter->setValue("blocks_per_thread", cmat->getNBlocks()[i]);
       exporter->setValue("partial_dim", cmat->getVRange(i)->range);
@@ -106,17 +104,17 @@ namespace CGF{
     case Allocate:
 #if 1
       try{
-	/*Try to allocate all the memory needed. If this fails,
-	  deallocate and throw an exception*/
-	allocate(caller);
+        /*Try to allocate all the memory needed. If this fails,
+          deallocate and throw an exception*/
+        allocate(caller);
       }catch(CUDAException& e){
-	std::cerr << e.getError();
-	valid = false;
-	deallocate(caller);
-	throw;
+        std::cerr << e.getError();
+        valid = false;
+        deallocate(caller);
+        throw;
       }catch(Exception& e){
-	std::cerr << e.getError();
-	throw;
+        std::cerr << e.getError();
+        throw;
       }
 #else
       allocate(caller);
@@ -141,10 +139,10 @@ namespace CGF{
   void ParallelSPMVCudaTask<N, T>::copyResult(const Thread* caller){
 #if 1
     message("%d", x->getSize());
-    cudaSafeCall(cudaMemcpy(x->data + cx->getVRange(TID)->startBlock, 
-			    cx->getData(TID),//d_res[TID], 
-			    sizeof(T)*x->getSize(), 
-			    cudaMemcpyDeviceToHost));
+    cudaSafeCall(cudaMemcpy(x->data + cx->getVRange(TID)->startBlock,
+                            cx->getData(TID),//d_res[TID],
+                            sizeof(T)*(uint)x->getSize(),
+                            cudaMemcpyDeviceToHost));
 #endif
   }
 
@@ -157,7 +155,7 @@ namespace CGF{
   void ParallelSPMVCudaTask<N, T>::allocate(const Thread* caller){
     init_cuda_thread(TID + device_offset);
     //init_cuda_thread(0);
-    
+
     /*Allocate data*/
     cmat->allocateDevice(caller);
     cx->allocateDevice(caller);
@@ -200,7 +198,7 @@ namespace CGF{
     /*cx->gather(caller);
       caller->sync();
       cx->scatter(caller);
-      
+
       cx->print(caller);
       getchar();
     */

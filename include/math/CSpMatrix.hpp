@@ -24,11 +24,6 @@
 #define CUDASPMATRIX_HPP
 #ifdef CUDA
 
-//#include "core/ThreadPool.hpp"
-
-//#include "math/PVector.hpp"
-
-#include "cuda_runtime.h"
 #include "math/CObject.hpp"
 #include "math/CVector.hpp"
 #include "math/CUDASpmv.hpp"
@@ -39,7 +34,7 @@
 #ifdef CSPMATRIX_EXT
 #define NX 1
 namespace CGF{
-  inline uint HNNX(uint n, uint nth){
+  inline int HNNX(int n, int nth){
     if(NX > nth/(n*n)){
       //message("N = %d, NTHREADS = %d, NX = %d, maxNX = %d", n, nth, NX, nth/(n*n));
       return nth/(n*n);
@@ -61,18 +56,18 @@ namespace CGF{
 
   template<int N, class T>
   void parallel_spmv_cuda(T* d_blocks, 
-			  uint* d_col_indices, 
-			  uint* d_row_lengths, uint* d_row_indices,
-			  const T* d_b, T* d_x, uint dim, 
-			  uint n_blocks, uint device);
+                          int* d_col_indices, 
+                          int* d_row_lengths, int* d_row_indices,
+                          const T* d_b, T* d_x, int dim, 
+                          int n_blocks, int device);
 
   template<int N, class T>
   void ordered_spmv_cuda(T* d_blocks, 
-			 uint* d_col_indices, 
-			 uint* d_row_lengths, uint* d_row_indices,
-			 uint* d_row_map,
-			 const T* d_b, T* d_x, uint dim, 
-			 uint n_blocks);
+                         int* d_col_indices, 
+                         int* d_row_lengths, int* d_row_indices,
+                         int* d_row_map,
+                         const T* d_b, T* d_x, int dim, 
+                         int n_blocks);
 
 
 
@@ -80,8 +75,8 @@ namespace CGF{
   class CSpMatrix : public CObject{
   public:
     CSpMatrix(const SpMatrix<N, T> * const matrix, 
-	      int n_th = 256, 
-	      TextureOperation tex = TexVector, const ThreadPool* p = 0);
+              int n_th = 256, 
+              TextureOperation tex = TexVector, const ThreadPool* p = 0);
     virtual ~CSpMatrix();
     void computeBlockDistribution();
 
@@ -97,11 +92,11 @@ namespace CGF{
     void preSpmv(const Thread* caller);
     void spmv(CVector<T>* x, const CVector<T>* const b, const Thread* caller);
 
-    uint getWidth()const{
+    int getWidth()const{
       return mat->getWidth();
     }
 
-    uint getHeight()const{
+    int getHeight()const{
       return mat->getHeight();
     }
 
@@ -110,17 +105,17 @@ namespace CGF{
 #ifdef CSPMATRIX_EXT    
     /*Extension for other methods*/
     T** d_ext_blocks;
-    uint** d_ext_col_indices;
-    uint** d_ext_row_lengths; /*Block row length per cuda block*/
-    uint** d_ext_row_indices;
-    uint** d_ext_row_map;
+    int** d_ext_col_indices;
+    int** d_ext_row_lengths; /*Block row length per cuda block*/
+    int** d_ext_row_indices;
+    int** d_ext_row_map;
 
-    uint* n_ext_blocks;
+    int* n_ext_blocks;
 #else
     T** d_blocks;
-    uint** d_col_indices;
-    uint** d_row_lengths;
-    uint** d_row_indices;
+    int** d_col_indices;
+    int** d_row_lengths;
+    int** d_row_indices;
 #endif
     
     TextureOperation texture;

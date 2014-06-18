@@ -83,7 +83,7 @@ namespace CGF{
     }
   }
 
-  void CSVExporter::setValue(const char* column, uint value){
+  void CSVExporter::setValue(const char* column, int value){
     std::map<std::string, std::string>::iterator it;
     std::string key(column);
     
@@ -100,7 +100,7 @@ namespace CGF{
   }
 
 
-  void CSVExporter::setValue(const char* column, int value){
+  void CSVExporter::setValue(const char* column, uint value){
     std::map<std::string, std::string>::iterator it;
     std::string key(column);
     
@@ -163,13 +163,13 @@ namespace CGF{
   }
 
   void CSVExporter::saveHeader(){
-    for(uint i=0;i<n_columns;i++){
+    for(int i=0;i<n_columns;i++){
       fprintf(file, "%s", indexMap[i].c_str());
 
       if(i+1 == n_columns){
-	fprintf(file, "\n");
+        fprintf(file, "\n");
       }else{
-	fprintf(file, ";");
+        fprintf(file, ";");
       }
     }
     
@@ -181,13 +181,13 @@ namespace CGF{
       saveHeader();
     }
 
-    for(uint i=0;i<n_columns;i++){
+    for(int i=0;i<n_columns;i++){
       fprintf(file, "%s", valueMap[indexMap[i]].c_str());
 
       if(i+1 == n_columns){
-	fprintf(file, "\n");
+        fprintf(file, "\n");
       }else{
-	fprintf(file, ";");
+        fprintf(file, ";");
       }
     }
     fflush(file);

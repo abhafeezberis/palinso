@@ -38,6 +38,9 @@ namespace CGF{
       timeMap[key] = t;
     }
     /*The timer must be in a stoppped state*/
+    if(timeMap[key].state != 0){
+      error("timer %s not stopped", timerName);
+    }
     cgfassert(timeMap[key].state == 0);
 
     timeMap[key].state = 1;
@@ -61,13 +64,13 @@ namespace CGF{
 
     timersub(&now, &(timeMap[key].last_time), &diff);
     timeradd(&diff, &(timeMap[key].total_time), 
-	     &(timeMap[key].total_time));
+             &(timeMap[key].total_time));
     timeMap[key].n++;
     timeMap[key].state = 0;
   }
 
-  ulong BenchmarkTimer::getAverageTimeUSec(const char* timerName){
-    ulong usec = 0;
+  long BenchmarkTimer::getAverageTimeUSec(const char* timerName){
+    long usec = 0;
 
     std::string key(timerName);
 
@@ -76,14 +79,14 @@ namespace CGF{
       return 0;
     }else{
       usec = timeMap[key].total_time.tv_sec * 1000000 + 
-	timeMap[key].total_time.tv_usec;
+        timeMap[key].total_time.tv_usec;
       usec = (long)((double) usec/(double)timeMap[key].n);
-    return usec; 
+      return usec; 
     }
   }
 
-  ulong BenchmarkTimer::getTotalTimeUSec(const char* timerName){
-    ulong usec = 0;
+  long BenchmarkTimer::getTotalTimeUSec(const char* timerName){
+    long usec = 0;
 
     std::string key(timerName);
     
@@ -92,12 +95,12 @@ namespace CGF{
       return 0;
     }else{
       usec = timeMap[key].total_time.tv_sec * 1000000 + 
-	timeMap[key].total_time.tv_usec;
+        timeMap[key].total_time.tv_usec;
       return usec;
     }
   }
 
-  ulong BenchmarkTimer::getTotalCalls(const char* timerName){
+  long BenchmarkTimer::getTotalCalls(const char* timerName){
     std::string key(timerName);
 
     std::map<std::string, timer>::iterator it = timeMap.find(key);
@@ -108,7 +111,7 @@ namespace CGF{
     }
   }
 
-  ulong BenchmarkTimer::getAccumulativeUSec(){
+  long BenchmarkTimer::getAccumulativeUSec(){
     std::map<std::string, timer>::iterator it;
     struct timeval acc;
     timerclear(&acc);
@@ -117,18 +120,18 @@ namespace CGF{
       timeradd(&acc, &((*it).second.total_time), &acc);
     }
 
-    ulong usec = acc.tv_sec * 1000000 + acc.tv_usec;
+    long usec = acc.tv_sec * 1000000 + acc.tv_usec;
     return usec;
   }
 
   void BenchmarkTimer::printAverageUSec(const char* timerName){
-    ulong usec = getAverageTimeUSec(timerName);
+    long usec = getAverageTimeUSec(timerName);
     message("Timer %s took %u usec on avarage after %d calls", 
-	    timerName, usec, timeMap[std::string(timerName)].n);
+            timerName, usec, timeMap[std::string(timerName)].n);
   }
 
   void BenchmarkTimer::printTotalUSec(const char* timerName){
-    ulong usec = getTotalTimeUSec(timerName);
+    long usec = getTotalTimeUSec(timerName);
     message("Timer %s took %u usec", timerName, usec);
   }
 
@@ -137,11 +140,11 @@ namespace CGF{
     for(it = timeMap.begin(); it != timeMap.end();it++){
       timer t = (*it).second;
 
-      ulong usec = t.total_time.tv_sec * 1000000 + 
-	t.total_time.tv_usec;
+      long usec = t.total_time.tv_sec * 1000000 + 
+        t.total_time.tv_usec;
       usec = (long)((double) usec/(double)t.n);
       message("Timer %s took %u usec on avarage after %d calls", 
-	      (*it).first.c_str(), usec, t.n);
+              (*it).first.c_str(), usec, t.n);
     }
   }
 
@@ -150,10 +153,10 @@ namespace CGF{
     for(it = timeMap.begin(); it != timeMap.end();it++){
       timer t = (*it).second;
 
-      ulong usec = t.total_time.tv_sec * 1000000 + 
-	t.total_time.tv_usec;
+      long usec = t.total_time.tv_sec * 1000000 + 
+        t.total_time.tv_usec;
       message("Timer %s took %u usec", 
-	      (*it).first.c_str(), usec);
+              (*it).first.c_str(), usec);
     }
   }
 
@@ -167,7 +170,7 @@ namespace CGF{
       timeradd(&acc, &((*it).second.total_time), &acc);
     }
 
-    ulong usec = acc.tv_sec * 1000000 + acc.tv_usec;
+    long usec = acc.tv_sec * 1000000 + acc.tv_usec;
     message("Accumulative time %u usec", usec);
   }
 }

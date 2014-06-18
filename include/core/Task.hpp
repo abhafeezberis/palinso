@@ -22,7 +22,7 @@
 
 #ifndef TASK_HPP
 #define TASK_HPP
-
+#ifdef USE_THREADS
 #include "core/cgfdefs.hpp"
 
 namespace CGF{
@@ -33,11 +33,11 @@ namespace CGF{
   
   class CGFAPI Task{
   public:
-    Task(const uint _n):subTask(0), valid(true), n_threads(_n){}
+    Task(const int _n):subTask(0), valid(true), n_threads(_n){}
     virtual ~Task(){}
     virtual void execute(const Thread* caller) = 0;
 
-    void setSubTask(uint t){
+    void setSubTask(int t){
       subTask = t;
     };
 
@@ -45,16 +45,16 @@ namespace CGF{
       return valid;
     }
     
-    uint getNumberOfThreads()const{
+    int getNumberOfThreads()const{
       return n_threads;
     }
 
   protected:
-    uint subTask;
+    int subTask;
     bool valid;
-    const uint n_threads;
+    const int n_threads;
     friend class Thread;
   };
 }
-
+#endif/*USE_THREADS*/
 #endif/*TASK_HPP*/

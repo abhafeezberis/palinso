@@ -22,7 +22,7 @@
 
 #ifndef THREAD_HPP
 #define THREAD_HPP
-
+#ifdef USE_THREADS
 #include "core/cgfdefs.hpp"
 #include "core/Task.hpp"
 #include "core/Barrier.hpp"
@@ -34,34 +34,34 @@ namespace CGF{
 
   class CGFAPI Thread{
   public:
-    Thread(uint id);
+    Thread(int id);
     Thread(const Thread&);
     ~Thread();
     
     void start();
     void stop();
     void run();
-
+    
     Task* getTask()const{
       return task;
     }
     void     setTask(Task* task){
       this->task = task;
     }
-
-    uint  getId()const{
+    
+    int getId()const{
       return id;
     }
-
-    void     setLastId(uint last_id){
+    
+    void setLastId(int last_id){
       this->last_id = last_id;
     }
 
-    uint  getLastId()const{
+    int getLastId()const{
       return last_id;
     }
 
-    void     setBarrier(const Barrier* bar){
+    void setBarrier(const Barrier* bar){
       barrier = bar;
     }
 
@@ -80,8 +80,8 @@ namespace CGF{
     void setCuda()const{
 #ifdef CUDA
       if(cudaAssigned == false){
-	init_cuda_thread(id);
-	cudaAssigned = true;
+        init_cuda_thread(id);
+        cudaAssigned = true;
       }
 #endif
     }
@@ -90,10 +90,10 @@ namespace CGF{
     Task*          task;          /*The task that is currently being executed*/
     pthread_t      thread_id;     /*OS ID*/
     pthread_attr_t attr;          /*Thread attributes*/
-    uint           status;
+    int            status;
     const Barrier* barrier;
-    uint           id;            /*Logical ID*/
-    uint           last_id;       /*Last logical ID*/
+    int            id;            /*Logical ID*/
+    int            last_id;       /*Last logical ID*/
 
     ThreadPool*    pool;
     friend class Task;
@@ -102,5 +102,5 @@ namespace CGF{
     mutable bool cudaAssigned;
   };
 }
-
+#endif/*USE_THREADS*/
 #endif/*THREAD_HPP*/

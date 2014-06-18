@@ -22,20 +22,22 @@
 
 #ifndef CUDASPMV_HPP
 #define CUDASPMV_HPP
+
 #ifdef CUDA
+
 namespace CGF{
   enum TextureOperation{TexNone = 0, TexVector, TexVectorAndIndices};
 
- /*N = block_size, T = float|doublem N_THR = 128, 256, 512, TEX=0, 1, 2*/
+  /*N = block_size, T = float|doublem N_THR = 128, 256, 512, TEX=0, 1, 2*/
   template<int N, class T, int N_THR>
   class CUDASPMV{
   public:
     static void spmv_ordered(T* d_blocks, 
-			     uint* d_col_indices, 
-			     uint* d_row_lengths, uint* d_row_indices,
-			     uint* d_row_map,
-			     const T* d_b, T* d_x, uint dim, 
-			     uint n_blocks, TextureOperation tex_op);
+                             int* d_col_indices, 
+                             int* d_row_lengths, int* d_row_indices,
+                             int* d_row_map,
+                             const T* d_b, T* d_x, int dim, 
+                             int n_blocks, TextureOperation tex_op);
   };
 }
 #endif/*CUDA*/

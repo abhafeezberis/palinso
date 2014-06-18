@@ -20,13 +20,19 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. */
 
-#include <pthread.h>
 #include "core/cgfdefs.hpp"
+#ifdef USE_THREADS
+#include <pthread.h>
+#endif
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
+#ifdef _WIN32
+
+#else
 #include <unistd.h>
 #include <sys/time.h>
+#endif
 #include <string.h>
 #include <map>
 #include <iostream>
@@ -35,62 +41,79 @@
 #include "math/Noise.hpp"
 #include "math/Random.hpp"
 #endif
+#ifdef USE_THREADS
 #include "core/ThreadPool.hpp"
 #include "core/daemon.hpp"
-
-#ifndef CUDA
-#include <cuda_runtime_api.h>
 #endif
 
 using namespace CGF;
 
 namespace CGF{
 
-  uint traceLevel = 0;
+  int traceLevel = 0;
   struct timeval start_time;
+#ifdef USE_THREADS
   pthread_mutex_t msg_mutex;
+#endif
 
   /*Static map which contains all instances of threadpools*/
-  static std::map<uint, ThreadPool*> threadPools;
+  static std::map<int, ThreadPool*> threadPools;
 
   void gettimediffstring(char* buffer, timeval diff){
     sprintf(buffer, "%6d.%06d", (int)diff.tv_sec,(int)diff.tv_usec);
   }
 
-  void init(uint daemon){
+  void init(int daemon){
     gettimeofday(&start_time, NULL);
+#ifdef USE_THREADS
     pthread_mutex_init(&msg_mutex, NULL);
+#endif
 
 #ifdef NOISE
     /*Initialize random number generators*/
-    Random<float>::init();
-    Random<double>::init();
+    //StaticRandom<float>::init();
+    //StaticRandom<double>::init();
 
     Noise<float>::init();
     Noise<double>::init();
 #endif
 
+#ifdef USE_THREADS
     threadPools.clear();
 
-    if(daemon){
+    if(daemon == 1){
       continue_as_daemon_process();
       if(is_daemon()){
-	redirect_std_file_descriptors();
+        redirect_std_file_descriptors();
       }else{
-	message("Exit %d", getpid());
-	//destroy();
-	exit(0);
+        message("Exit %d", getpid());
+        //destroy();
+        exit(0);
       }
     }
+
+    if(daemon == 2){
+      continue_as_daemon_process();
+      if(is_daemon()){
+        redirect_std_file_descriptors_null();
+      }else{
+        message("Exit %d", getpid());
+        //destroy();
+        exit(0);
+      }
+    }
+#endif
   }
 
   void destroyThreadPools(){
-    std::map<uint, ThreadPool*>::iterator it = threadPools.begin();
+#ifdef USE_THREADS
+    std::map<int, ThreadPool*>::iterator it = threadPools.begin();
     for(;it!=threadPools.end();it++){
       ThreadPool* p = (*it).second;
       delete p;
     }
     threadPools.clear();
+#endif
   }
 
 #ifdef CUDA
@@ -99,8 +122,8 @@ namespace CGF{
 
   void destroy(){
 #ifdef NOISE
-    Random<float>::destroy();
-    Random<double>::destroy();
+    //StaticRandom<float>::destroy();
+    //StaticRandom<double>::destroy();
 
     Noise<float>::destroy();
     Noise<double>::destroy();
@@ -115,17 +138,15 @@ namespace CGF{
 #endif
   }
 
-  ThreadPool* getThreadPool(uint i){
+  ThreadPool* getThreadPool(int i){
+#ifdef USE_THREADS
     if(threadPools[i] == 0){
       threadPools[i] = new ThreadPool(i);
       threadPools[i]->start();
     }
     return threadPools[i];
-  }
-
-  int cgfrandom(int& seed){
-    seed = 1664525UL*seed+1013904223UL;
-    return seed;
+#endif
+	return 0;
   }
 
   void message(const char* format, ...){
@@ -138,7 +159,9 @@ namespace CGF{
     timersub(&now, &start_time, &diff);
     gettimediffstring(buffer, diff);
 
+#ifdef USE_THREADS
     pthread_mutex_lock(&msg_mutex);
+#endif
 
     fprintf(stdout,"[M   %s] ", buffer);
 
@@ -147,7 +170,10 @@ namespace CGF{
     va_end(args);
     fprintf(stdout,"\n");
     fflush(stdout);
+
+#ifdef USE_THREADS
     pthread_mutex_unlock(&msg_mutex);
+#endif
   }
 
   void error(const char* format, ...){
@@ -160,7 +186,9 @@ namespace CGF{
     timersub(&now, &start_time, &diff);
     gettimediffstring(buffer, diff);
 
+#ifdef USE_THREADS
     pthread_mutex_lock(&msg_mutex);
+#endif
 
     fprintf(stderr,"[  E %s] ", buffer);
 
@@ -172,7 +200,9 @@ namespace CGF{
     fflush(stdout);
     va_end(args);
 
+#ifdef USE_THREADS
     pthread_mutex_unlock(&msg_mutex);
+#endif
     abort();
   }
 
@@ -186,7 +216,9 @@ namespace CGF{
     timersub(&now, &start_time, &diff);
     gettimediffstring(buffer, diff);
 
+#ifdef USE_THREADS
     pthread_mutex_lock(&msg_mutex);
+#endif
 
     fprintf(stderr,"[ W  %s] ", buffer);
 
@@ -196,35 +228,19 @@ namespace CGF{
     va_end(args);
     fprintf(stderr,"\n");
 
+#ifdef USE_THREADS
     pthread_mutex_unlock(&msg_mutex);
+#endif
   }
 
-  void _cgfassert(const char* expr, const char* file, uint line){
+  void _cgfassert(const char* expr, const char* file, int line){
     error("%s:%d: ASSERT(%s) failed.\n", file, line, expr);
   }
 
-  void trace(unsigned int level, const char* format, ...){
-    if(traceLevel>level){
-      va_list args;
-      va_start(args, format);
-      vfprintf(stderr, format, args);
-      fflush(stderr);
-      va_end(args);
-    }
-  }
-
-  void msleep(uint n){
-
-  }
-
-  void usleep(uint n){
-
-  }
-
-  uint strhash(const char* string){
+  int strhash(const char* string){
     register const unsigned char *s = (const unsigned char*)string;
-    register uint h=0;
-    register uint c;
+    register int h=0;
+    register int c;
     while((c=*s++)!='\0'){
       h = ((h<<5)+h)^c;
     }

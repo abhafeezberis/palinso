@@ -23,6 +23,8 @@
 #ifndef SHUTDOWNTASK_HPP
 #define SHUTDOWNTASK_HPP
 
+#ifdef USE_THREADS
+
 #include "core/Task.hpp"
 #include "core/Thread.hpp"
 
@@ -31,12 +33,12 @@
 namespace CGF{
   class CGFAPI ShutDownTask : public Task{
   public:
-    ShutDownTask(uint _n):Task(_n){
+    ShutDownTask(int _n):Task(_n){
     }
     
     virtual ~ShutDownTask(){
     }
-
+    
     virtual void exportSummary(){}
     
     void execute(const Thread* caller){
@@ -44,4 +46,5 @@ namespace CGF{
   };
 }
 
+#endif/*USE_THREADS*/
 #endif/*SHUTDOWNTASK_HPP*/

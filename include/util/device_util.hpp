@@ -40,136 +40,136 @@
 
 #error
 
-#define REDUCE_2(vec, index, op, tx, TP)			\
-  if((tx) < 1){							\
+#define REDUCE_2(vec, index, op, tx, TP)                    \
+  if((tx) < 1){                                             \
     (vec)[(index)] = (vec)[(index)] op (vec)[(index)+1];	\
-  }								\
+  }                                                         \
   __syncthreads();
 
   
-#define REDUCE_4(vec, index, op, tx, TP)			\
-  if((tx) < 2){							\
+#define REDUCE_4(vec, index, op, tx, TP)                    \
+  if((tx) < 2){                                             \
     (vec)[(index)] = (vec)[(index)] op (vec)[(index)+2];	\
-  }								\
-  __syncthreads();						\
-  if((tx) < 2){							\
-      (vec)[(index)] = (vec)[(index)] op (vec)[(index)+1];	\
-  }								\
-  __syncthreads();
-
-#define REDUCE_8(vec, index, op, tx, TP)			\
-  if((tx) < 4){							\
-    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+4];	\
-  }								\
-  __syncthreads();						\
-  if((tx) < 4){							\
-    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+2];	\
-  }								\
-  __syncthreads();						\
-  if((tx) < 4){							\
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 2){                                             \
     (vec)[(index)] = (vec)[(index)] op (vec)[(index)+1];	\
-  }								\
+  }                                                         \
   __syncthreads();
 
-#define REDUCE_16(vec, index, op, tx, TP)			\
-  if((tx) < 8){							\
+#define REDUCE_8(vec, index, op, tx, TP)                    \
+  if((tx) < 4){                                             \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+4];	\
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 4){                                             \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+2];	\
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 4){                                             \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+1];	\
+  }                                                         \
+  __syncthreads();
+
+#define REDUCE_16(vec, index, op, tx, TP)                   \
+  if((tx) < 8){                                             \
     (vec)[(index)] = (vec)[(index)] op (vec)[(index)+8];	\
-  }								\
-  __syncthreads();						\
-  if((tx) < 8){							\
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 8){                                             \
     (vec)[(index)] = (vec)[(index)] op (vec)[(index)+4];	\
-  }								\
-  __syncthreads();						\
-  if((tx) < 8){							\
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 8){                                             \
     (vec)[(index)] = (vec)[(index)] op (vec)[(index)+2];	\
-  }								\
-  __syncthreads();						\
-  if((tx) < 8){							\
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 8){                                             \
     (vec)[(index)] = (vec)[(index)] op (vec)[(index)+1];	\
-  }								\
+  }                                                         \
   __syncthreads();
 
-#define REDUCE_32(vec, index, op, tx, TP)				\
-  if((tx) < 16){							\
-    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+16];		\
-  }									\
-  __syncthreads();							\
-  if((tx) < 16){							\
-    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+8];		\
-  }									\
-  __syncthreads();							\
-  if((tx) < 16){							\
-    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+4];		\
-  }									\
-  __syncthreads();							\
-  if((tx) < 16){							\
-    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+2];		\
-  }									\
-  __syncthreads();							\
-  if((tx) < 16){							\
-    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+1];		\
+#define REDUCE_32(vec, index, op, tx, TP)                   \
+  if((tx) < 16){                                            \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+16];   \
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 16){                                            \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+8];    \
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 16){                                            \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+4];    \
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 16){                                            \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+2];    \
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 16){                                            \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+1];    \
   }__syncthreads();
 
-#define REDUCE_64(vec, index, op, tx, TP)				\
-  if((tx) < 32){							\
-    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+32];		\
-  }									\
-  __syncthreads();							\
-  if((tx) < 32){							\
-    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+16];		\
-  }									\
-  __syncthreads();							\
-  if((tx) < 32){							\
-    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+8];		\
-  }									\
-  __syncthreads();							\
-  if((tx) < 32){							\
-    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+4];		\
-  }									\
-  __syncthreads();							\
-  if((tx) < 32){							\
-    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+2];		\
-  }									\
-  __syncthreads();							\
-  if((tx) < 32){							\
-    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+1];		\
+#define REDUCE_64(vec, index, op, tx, TP)                   \
+  if((tx) < 32){                                            \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+32];   \
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 32){                                            \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+16];   \
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 32){                                            \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+8];    \
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 32){                                            \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+4];    \
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 32){                                            \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+2];    \
+  }                                                         \
+  __syncthreads();                                          \
+  if((tx) < 32){                                            \
+    (vec)[(index)] = (vec)[(index)] op (vec)[(index)+1];    \
   }__syncthreads();
 
 #else
 
-#define REDUCE_2(vec, index, op, tx, TP)			\
-  if((tx) < 1){							\
-    volatile TP* s_vec = vec;					\
+#define REDUCE_2(vec, index, op, tx, TP)                        \
+  if((tx) < 1){                                                 \
+    volatile TP* s_vec = vec;                                   \
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+1];	\
   }
 
-#define REDUCE_4(vec, index, op, tx, TP)			\
-  if((tx) < 2){							\
-    volatile TP* s_vec = vec;					\
+#define REDUCE_4(vec, index, op, tx, TP)                        \
+  if((tx) < 2){                                                 \
+    volatile TP* s_vec = vec;                                   \
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+2];	\
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+1];	\
   }
 
-#define REDUCE_8(vec, index, op, tx, TP)			\
-  if((tx) < 4){							\
-    volatile TP* s_vec = vec;					\
+#define REDUCE_8(vec, index, op, tx, TP)                        \
+  if((tx) < 4){                                                 \
+    volatile TP* s_vec = vec;                                   \
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+4];	\
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+2];	\
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+1];	\
   }
 
-#define REDUCE_16(vec, index, op, tx, TP)			\
-  if((tx) < 8){							\
-    volatile TP* s_vec = vec;					\
+#define REDUCE_16(vec, index, op, tx, TP)                       \
+  if((tx) < 8){                                                 \
+    volatile TP* s_vec = vec;                                   \
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+8];	\
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+4];	\
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+2];	\
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+1];	\
   }
 
-#define REDUCE_32(vec, index, op, tx, TP)			\
-  if((tx) < 16){						\
-    volatile TP* s_vec = vec;					\
+#define REDUCE_32(vec, index, op, tx, TP)                       \
+  if((tx) < 16){                                                \
+    volatile TP* s_vec = vec;                                   \
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+16];	\
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+8];	\
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+4];	\
@@ -177,9 +177,9 @@
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+1];	\
   }
 
-#define REDUCE_64(vec, index, op, tx, TP)			\
-  if((tx) < 32){						\
-    volatile TP* s_vec = vec;					\
+#define REDUCE_64(vec, index, op, tx, TP)                       \
+  if((tx) < 32){                                                \
+    volatile TP* s_vec = vec;                                   \
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+32];	\
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+16];	\
     (s_vec)[(index)] = (s_vec)[(index)] op (s_vec)[(index)+8];	\
@@ -189,25 +189,25 @@
   }
 #endif
 
-#define REDUCE_128(vec, index, op, tx, TP)			\
-  if((tx) < 64){						\
+#define REDUCE_128(vec, index, op, tx, TP)                  \
+  if((tx) < 64){                                            \
     (vec)[(index)] = (vec)[(index)] op (vec)[(index)+64];	\
-  }								\
-  __syncthreads();						\
+  }                                                         \
+  __syncthreads();                                          \
   REDUCE_64(vec, index, op, tx, TP);
 
-#define REDUCE_256(vec, index, op, tx, TP)			\
-  if((tx) < 128){						\
+#define REDUCE_256(vec, index, op, tx, TP)                  \
+  if((tx) < 128){                                           \
     (vec)[(index)] = (vec)[(index)] op (vec)[(index)+128];	\
-  }								\
-  __syncthreads();						\
+  }                                                         \
+  __syncthreads();                                          \
   REDUCE_128(vec, index, op, tx, TP);
 
-#define REDUCE_512(vec, index, op, tx, TP)			\
-  if((tx) < 256){						\
+#define REDUCE_512(vec, index, op, tx, TP)                  \
+  if((tx) < 256){                                           \
     (vec)[(index)] = (vec)[(index)] op (vec)[(index)+256];	\
-  }								\
-  __syncthreads();						\
+  }                                                         \
+  __syncthreads();                                          \
   REDUCE_256(vec, index, op, tx, TP);
 
 //////

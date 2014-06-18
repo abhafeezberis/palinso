@@ -7,10 +7,10 @@
    modify, merge, publish, distribute, sublicense, and/or sell copies
    of the Software, and to permit persons to whom the Software is
    furnished to do so, subject to the following conditions:
-   
+
    The above copyright notice and this permission notice shall be
    included in all copies or substantial portions of the Software.
-   
+
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -26,11 +26,11 @@
 namespace CGF{
 
   template<int N, class T>
-  ParallelCGTask<N, T>::ParallelCGTask(const uint _n, 
-				       Vector<T>* const _x, 
-				       const SpMatrix<N, T>* const _mat, 
-				       const Vector<T>* const _b) : 
-    Task(_n),mat(_mat),x(_x), b(_b), tolerance(1e-6), maxIterations(100000){
+  ParallelCGTask<N, T>::ParallelCGTask(const int _n,
+                                       Vector<T>* const _x,
+                                       const SpMatrix<N, T>* const _mat,
+                                       const Vector<T>* const _b) :
+    Task(_n),mat(_mat),x(_x), b(_b), tolerance((T)1e-6), maxIterations(100000){
     /*Allocate shared resources*/
 
     r = new Vector<T>(mat->getHeight());
@@ -58,9 +58,9 @@ namespace CGF{
     vRange   = new VectorRange[n_threads];
     mRange   = new MatrixRange[n_threads];
 
-    n_blocks = new uint[n_threads];
+    n_blocks = new int[n_threads];
 
-    k = new uint[n_threads];
+    k = new int[n_threads];
   }
 
   template<int N, class T>
@@ -88,13 +88,13 @@ namespace CGF{
   template<int N, class T>
   void ParallelCGTask<N, T>::setb(Vector<T>* vec){
     cgfassert(vec->getSize() == b->getSize());
-    b = vec;    
+    b = vec;
   }
 
   template<int N, class T>
   void ParallelCGTask<N, T>::setx(Vector<T>* vec){
     cgfassert(vec->getSize() == x->getSize());
-    x = vec;    
+    x = vec;
   }
 
   template<int N, class T>
@@ -106,64 +106,40 @@ namespace CGF{
 
   template<int N, class T>
   void ParallelCGTask<N, T>::execute(const Thread* caller){
-     /*r = b - Ax*/
+    if(TID == 0){
+      /*Compute norm of b*/
+      Vector<T>::mul(*scratch1, *b, *b);
+      bnorm = Sqrt(scratch1->sum());
+    }
+    caller->sync();
+
+    /*r = b - Ax*/
     spmv_partial(*r, *mat, *x, mRange[TID]);
 
     Vector<T>::subp(*r, *b, *r, vRange[TID]);
-    
+
     /*w = C * r*/
     /*v = C * w*/
     Vector<T>::mulp(*w, *C, *r, vRange[TID]);
     Vector<T>::mulp(*v, *C, *w, vRange[TID]);
-    
+
     /*alpha = w*w */
-    Vector<T>::mulp(*scratch1, *w, *w, vRange[TID]);    
-
-    reductions2[TID] = scratch1->sump(vRange[TID]);
-    caller->sync();
-
-    T lalpha = 0;
-    for(uint i=0;i<n_threads;i++){
-      lalpha += reductions2[i];  
-    }
-
-    caller->sync();
-
-    /*res = v * v*/
-    Vector<T>::mulp(*scratch1, *v, *v, vRange[TID]);
-
-    reductions2[TID] = scratch1->sump(vRange[TID]);
-
-    caller->sync();
-
-    double lresidual = 0;
-    for(uint i=0;i<n_threads;i++){
-      lresidual += reductions2[i];  
-    }
-
-    lresidual = sqrt(lresidual);
+    Vector<T>::mulp(*scratch1, *w, *w, vRange[TID]);
+    T lalpha = scratch1->sum(reductions2, caller, vRange);
 
     k[TID] = 0;
 
     while(k[TID]<maxIterations){
-    //while(k[TID] < 103){
       /*Compute |V| */
       Vector<T>::mulp(*scratch1, *v, *v, vRange[TID]);
-      reductions1[TID] = scratch1->sump(vRange[TID]);
-      caller->sync();
+      T lresidual = scratch1->sum(reductions1, caller, vRange);
 
-      T lresidual = 0;
-      for(uint i=0;i<n_threads;i++){
-	lresidual += reductions1[i];
-      }
-
-      //lresidual = sqrt(lresidual);
-      if(sqrt(fabs(lresidual))<tolerance){
-	if(TID == 0){
-	  message("Succesfull in %d iterations, %10.10e, %10.10e", k[TID],
-		  lresidual, sqrt(fabs(lresidual)));
-	}
-	return;
+      if(Sqrt(Fabs(lresidual))< (tolerance*bnorm + tolerance)){
+        if(TID == 0){
+          message("Succesfull in %d iterations, %10.10e, %10.10e", k[TID],
+                  lresidual, Sqrt(Fabs(lresidual)));
+        }
+        return;
       }
 
       /*u = Av*/
@@ -171,13 +147,7 @@ namespace CGF{
 
       /*divider = v*u */
       Vector<T>::mulp(*scratch3, *v, *u, vRange[TID]);
-      reductions2[TID] = scratch3->sump(vRange[TID]);
-      caller->sync();
-
-      T ldivider = 0;
-      for(uint i=0;i<n_threads;i++){
-	ldivider += reductions2[i];
-      }
+      T ldivider = scratch3->sum(reductions2, caller, vRange);
 
       /*t = alpha / (v*u) */
       T t = lalpha/ldivider;
@@ -191,51 +161,28 @@ namespace CGF{
 
       /*beta = w*w */
       Vector<T>::mulp  (*scratch5, *w, *w, vRange[TID]);
-      reductions3[TID] = scratch5->sump(vRange[TID]);
-      caller->sync();
+      T lbeta = scratch5->sum(reductions3, caller, vRange);
+      T ls = 0;
 
-      double lbeta = 0;
-      double ls = 0;
-      for(uint i=0;i<n_threads;i++){
-	lbeta += reductions3[i];
-      }
-      
-#if 0
-      if(k[TID]%100 == 0){
-	message("beta[%d] = %10.10e", TID, lbeta);
-	message("residual[%d] = %10.10e", TID, lresidual);
-      }
-#endif
-      
       ls = lbeta/lalpha;
       lalpha = lbeta;
-
 #if 1
-      if(lbeta < tolerance){
+      if(lbeta < (tolerance*bnorm + tolerance)){
 #if 1
-	Vector<T>::mulp(*scratch1, *r, *r, vRange[TID]);
-	reductions2[TID] = scratch1->sump(vRange[TID]);
-	caller->sync();
-	
-	double rl = 0;
-	for(uint i=0;i<n_threads;i++){
-	  rl += reductions2[i];
-	}
+        Vector<T>::mulp(*scratch1, *r, *r, vRange[TID]);
+        T rl = scratch1->sum(reductions2, caller, vRange);
 
-	//rl = sqrt(rl);
-	if(rl< tolerance){
+        if(Sqrt(rl)< (tolerance*bnorm + tolerance)){
 #endif
-	  if(TID == 0){
-	    message("Succesfull in %d iterations, %10.10e, %10.10e", k[TID],
-		    rl, sqrt(fabs(rl)));
-	  }
-	  //message("Succesfull in %d iterations", k[TID]);
-	  return;
-	}
+          if(TID == 0){
+            message("Succesfull in %d iterations, %10.10e, %10.10e", k[TID],
+                    rl, Sqrt(Fabs(rl)));
+          }
+          return;
+        }
       }
 
 #endif
-
 
       /*v = C*w + sv */
       Vector<T>::mulp(*scratch3, *C, *w, vRange[TID]);
@@ -244,33 +191,30 @@ namespace CGF{
     }
     if(TID == 0){
       message("Unsuccesfull");
-    }    
+    }
   }
-  
+
   template<int N, class T>
   void ParallelCGTask<N, T>::computePreconditioner(){
     /*Create preconditioner*/
-    for(uint i=0;i<mat->getHeight();i++){
-      (*x)[i] = 1;
-      (*r)[i] = 0;
-#if 0
-      (*C)[i] = 1.0/((*mat)[i][i]);//1.0/sqrt((*mat)[i][i]);
-      //cgfassert((*mat)[i][i] > 0);
-#else
-      (*C)[i] = 1.0/sqrt((*mat)[i][i]);
-      cgfassert((*mat)[i][i] > 0);
-#endif
-    }    
+    for(int i=0;i<mat->getHeight();i++){
+      (*C)[i] = (T)1.0/Sqrt(Fabs((*mat)[i][i]));
+    }
   }
 
   template<int N, class T>
   void ParallelCGTask<N, T>::computeDistribution(){
     mat->computeBlockDistribution(mRange, vRange, n_blocks, n_threads);
 
-#if 0    
-    for(uint i=0;i<n_threads;i++){
-      message("mRange.start = %d, end = %d, range = %d", 
-	      mRange[i].startRow, mRange[i].endRow, mRange[i].range);
+#if 0
+    for(int i=0;i<n_threads;i++){
+      message("mRange.start = %d, end = %d, range = %d",
+              mRange[i].startRow, mRange[i].endRow, mRange[i].range);
+    }
+    for(int i=0;i<n_threads;i++){
+      message("vRange.start = %d, end = %d, range = %d, steps = %d",
+              vRange[i].startBlock, vRange[i].endBlock, vRange[i].range,
+              computeSteps(vRange[i].range));
     }
 #endif
   }

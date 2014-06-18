@@ -40,9 +40,9 @@ namespace CGF{
   template<int N, class T>
   class CGFAPI ParallelBICGSTABTask : public Task{
   public:
-    ParallelBICGSTABTask(const uint n_threads, Vector<T>* const x, 
-			 const SpMatrix<N, T>* const mat, 
-			 const Vector<T>* const b);
+    ParallelBICGSTABTask(const int n_threads, Vector<T>* const x, 
+                         const SpMatrix<N, T>* const mat, 
+                         const Vector<T>* const b);
 
     virtual ~ParallelBICGSTABTask();
 
@@ -71,9 +71,9 @@ namespace CGF{
     
     VectorRange* vRange;
     MatrixRange* mRange;
-    uint* n_blocks;
+    int* n_blocks;
     BenchmarkTimer* timers;
-    uint* k;
+    int* k;
   };
 }
 

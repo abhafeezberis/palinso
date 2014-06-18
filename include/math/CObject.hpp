@@ -37,23 +37,23 @@ namespace CGF{
     
     const ThreadPool* getPool()const;
 
-    uint getNDevices()const;
+    int getNDevices()const;
 
     void setMRanges(const MatrixRange* range);
 
-    const MatrixRange* getMRange(uint i)const;
+    const MatrixRange* getMRange(int i)const;
 
     const MatrixRange* getMRanges()const;
 
     void setVRanges(const VectorRange* range);
 
-    const VectorRange* getVRange(uint i)const;
+    const VectorRange* getVRange(int i)const;
 
     const VectorRange* getVRanges()const;
 
-    void setNBlocks(const uint* blocks);
+    void setNBlocks(const int* blocks);
 
-    const uint* getNBlocks()const;
+    const int* getNBlocks()const;
 
     void copyRanges(const CObject* obj);
 
@@ -62,11 +62,11 @@ namespace CGF{
 
   protected:
     const ThreadPool* pool;
-    uint n_devices;
+    int n_devices;
     MatrixRange* mRange;
     VectorRange* vRange;
-    uint* startBlock;
-    uint* n_blocks;
+    int* startBlock;
+    int* n_blocks;
   };
 }
 

@@ -22,7 +22,7 @@
 
 #ifndef THREADPOOL_H
 #define THREADPOOL_H
-
+#ifdef USE_THREADS
 #include <pthread.h>
 
 #include "core/cgfdefs.hpp"
@@ -49,9 +49,9 @@ namespace CGF{
   typedef struct _task task_t;
   struct _task{
     Task* task;
-    uint subTask;
+    int subTask;
   };
-
+  
   /*Manages the execution of tasks given a number of threads*/
 
   /*When a thread has executed its associated task(s), the thread is
@@ -61,35 +61,35 @@ namespace CGF{
   public:
     friend class Thread;
     ThreadPool();
-    ThreadPool(uint n);
+    ThreadPool(int n);
     ThreadPool(const ThreadPool&);
     ~ThreadPool();
-
+    
     void start(); /*Starts all the threads*/
-
+    
     /*Pauses the execution of all threads*/
-    void pause(uint usec);
-
+    void pause(int usec);
+    
     /*Continues the execution of all blocked threads. For instance
       after the addition of new tasks*/
     void unblock();
-
+    
     /*Executes the task with the specified number of threads*/
-    void assignTask(Task* task, uint subTask = 0);
-
+    void assignTask(Task* task, int subTask = 0);
+    
     void assignNewTask();
-
+    
     void sync();
-
-    uint getSize()const{
+    
+    int getSize()const{
       return n_threads;
     }
-
+    
     bool empty()const{
       message("size = %d", taskQueue.size());
       return taskQueue.size()==0?true:false;
     }
-
+    
   protected:
     void removeLastTask();
 
@@ -98,30 +98,30 @@ namespace CGF{
     void waitForEmptyQueue();
 
     void waitForNewTask();      /*Called by an active thread. If no
-				  tasks are avaialble this function
-				  will block*/
+                                  tasks are avaialble this function
+                                  will block*/
 
-    uint n_blocked_threads;
+    int n_blocked_threads;
 
-    uint n_threads;
+    int n_threads;
     Barrier* barrier;
     Thread** threads;
 
     std::queue<task_t> taskQueue;
 
     Task* getCurrentTask();  /*Called by child threads to obtain a
-			       current task.  If NULL is returned, no
-			       tasks are in the queue and the calling
-			       thread should block. If the main
-			       thread adds a new task, the blocked
-			       threads shoud be signaled*/
+                               current task.  If NULL is returned, no
+                               tasks are in the queue and the calling
+                               thread should block. If the main thread
+                               adds a new task, the blocked threads
+                               shoud be signaled*/
 
     pthread_mutex_t condMutex;
     pthread_cond_t condition;
-
+    
     pthread_mutex_t blockMutex;
     pthread_cond_t blockCondition;
-
+    
     pthread_mutex_t syncMutex;
     pthread_cond_t syncCondition;
 
@@ -130,5 +130,5 @@ namespace CGF{
     pthread_mutex_t blockedMutex;
   }; 
 }
-
+#endif/*USE_THREADS*/
 #endif/*THREADPOOL*/

@@ -20,17 +20,23 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. */
 
+#ifdef USE_THREADS
 #include "core/Thread.hpp"
 #include "core/ThreadPool.hpp"
 #include "core/Exception.hpp"
 #include "core/ShutDownTask.hpp"
 #include <iostream>
+#endif
+
 #ifdef CUDA
-#include <cuda_runtime_api.h>
 #include "util/cuda_util.hpp"
+#ifndef USE_THREADS
+#error CUDA requires USED_THREADS to be defined
+#endif
 #endif
 
 namespace CGF{
+#ifdef USE_THREADS
   /*Interface between C and C++*/
     
   void thread_cleanup(void* arg){
@@ -55,8 +61,8 @@ namespace CGF{
     return NULL;
   }
   
-  Thread::Thread(uint _id):task(NULL), thread_id(0), 
-			   barrier(NULL), id(_id) {
+  Thread::Thread(int _id):task(NULL), thread_id(0), 
+                          barrier(NULL), id(_id) {
     status = 0;
     cudaAssigned = false;
   }
@@ -76,7 +82,7 @@ namespace CGF{
 
     pthread_create(&thread_id, &attr, thread_start, this);
     //message("Thread %d started with pid %ul", id, thread_id);
-    status = 1;
+    //status = 1;
     pthread_detach(thread_id);
   }
   
@@ -104,22 +110,21 @@ namespace CGF{
       
       /*Execute the task*/
       try{
-	if(task->subTask == SHUTDOWN_TASK){
-	  status = 0;
-	  return;
-	}
-	task->execute(this);
-	pool->removeLastTask();
+        if(task->subTask == SHUTDOWN_TASK){
+          status = 0;
+          return;
+        }
+        task->execute(this);
+        pool->removeLastTask();
       }catch(Exception& e){
-	message("Execution of task failed");
-	std::cerr << e.getError();
-	/*Remove current task from pool by removing all (sub)tasks*/
-	pool->removeFaultyTask(task);
+        message("Execution of task failed");
+        std::cerr << e.getError();
+        /*Remove current task from pool by removing all (sub)tasks*/
+        pool->removeFaultyTask(task);
       }catch(...){
-	message("Unknown error");
+        message("Unknown error");
       }
     }
-    
-    //    pthread_exit(NULL);
   }
+#endif
 }

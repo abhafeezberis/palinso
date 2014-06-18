@@ -40,7 +40,7 @@ namespace CGF{
 
   template<int N, class T>
   void save_matrix_market_exchange(const char* filename, 
-				   const SpMatrix<N, T>*const mat);
+                                   const SpMatrix<N, T>*const mat);
 
   template<int N, class T>
   Vector<T>* load_matrix_market_exchange_vector(const char* filename);

@@ -22,8 +22,12 @@
 
 #include <iostream>
 #include <fstream>
+#include <stdlib.h>
+#include <vector>
 #include "core/version.hpp"
 #include "math/LinSolveCG.hpp"
+#include "math/LinSolveCGParallel.hpp"
+#include "math/LinSolveCGGPU.hpp"
 #include "math/matrix_loaders.hpp"
 
 using namespace CGF;
@@ -38,7 +42,7 @@ void large_cg_test(uint i){
   message("Blocksize = %d", N);
   char filename[255];
 
-  sprintf(filename, "%s", matrixFiles[i].c_str());
+  sprintf(filename, "%s", matrixFiles[(uint)i].c_str());
 
   SpMatrix<N, T>* mat = 0;
 
@@ -51,7 +55,7 @@ void large_cg_test(uint i){
 
   if(mat){
     Vector<T> vec(mat->getWidth());
-    for(uint j=0;j<mat->getWidth();j++){
+    for(int j=0;j<mat->getWidth();j++){
       if(j%2==0)
 	vec[j] = 1;
       else
@@ -64,13 +68,23 @@ void large_cg_test(uint i){
 
     /*Enable the tests you like to perform.*/
 #if 1
-    message("Single threaded test");
+    message("Single non-threaded test");
     solver = new LinSolveCG<N, T>(mat->getWidth());
     solver->setMatrix(mat);
     solver->setb(&vec);
     solver->preSolve();
     solver->solve();
 
+    delete solver;
+#endif
+#if 1
+    message("Single threaded test");
+    solver = new LinSolveCGParallel<N, T>(mat->getWidth(), 1);
+    solver->setMatrix(mat);
+    solver->setb(&vec);
+    solver->preSolve();
+    solver->solve();
+    
     delete solver;
 #endif
 #if 1
@@ -106,6 +120,31 @@ void large_cg_test(uint i){
     delete solver;
 #endif
 #if 1
+    message("16 threaded test");
+
+    solver = new LinSolveCGParallel<N, T>(mat->getWidth(), 16);
+    solver->setMatrix(mat);
+    solver->setb(&vec);
+    solver->preSolve();
+    solver->solve();
+    
+    delete solver;
+#endif
+#if 1
+    message("32 threaded test");
+
+    solver = new LinSolveCGParallel<N, T>(mat->getWidth(), 32);
+    solver->setMatrix(mat);
+    solver->setb(&vec);
+    solver->preSolve();
+    solver->solve();
+    
+    delete solver;
+#endif
+
+
+#ifdef CUDA
+#if 1
     message("Single cuda test");
     solver = new LinSolveCGGPU<N, T>(mat->getWidth(), 1);
 
@@ -116,7 +155,7 @@ void large_cg_test(uint i){
     
     delete solver;
 #endif
-#if 1
+#if 0
     message("Dual cuda test");
     solver = new LinSolveCGGPU<N, T>(mat->getWidth(), 2);
 
@@ -126,6 +165,7 @@ void large_cg_test(uint i){
     solver->solve();
     
     delete solver;
+#endif
 #endif
     
     delete mat;

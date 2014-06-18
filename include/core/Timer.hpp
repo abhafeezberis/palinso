@@ -37,7 +37,7 @@ namespace CGF{
     float getTimeUSecF(){
       return (float) usec;
     }
-    uint  getTimeUSec(){
+    long  getTimeUSec(){
       return usec;
     }
 
@@ -45,7 +45,7 @@ namespace CGF{
 
   protected:
     struct timeval t1, t2, diff; 
-    uint usec;
+    long usec;
   };  
 }
 

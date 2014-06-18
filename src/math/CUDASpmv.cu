@@ -29,76 +29,86 @@
 namespace CGF{
   static texture<float, 1, cudaReadModeElementType> texf2;
   static texture<uint,  1, cudaReadModeElementType> texui2;
+  static texture<int,   1, cudaReadModeElementType> texi2;
   static texture<int2,  1, cudaReadModeElementType> texd2;
 
   template<class T>
-  void bindTexture2(T* d_array, uint size);
+  void bindTexture2(T* d_array, int size);
 
   template<>
-  void bindTexture2<float>(float* d_array, uint size){
-    cudaChannelFormatDesc channelDescr = 
-      cudaCreateChannelDesc(32,0,0,0,cudaChannelFormatKindFloat);
+  void bindTexture2<float>(float* d_array, int size){
+    //cudaChannelFormatDesc channelDescr = 
+    //cudaCreateChannelDesc(32,0,0,0,cudaChannelFormatKindFloat);
     
     size_t offset = size_t(-1);
     cudaSafeCall(cudaBindTexture(&offset, texf2, d_array));
   }
 
   template<>
-  void bindTexture2<double>(double* d_array, uint size){
-    cudaChannelFormatDesc channelDescr = 
-      cudaCreateChannelDesc(64,0,0,0,cudaChannelFormatKindFloat);
+  void bindTexture2<double>(double* d_array, int size){
+    //cudaChannelFormatDesc channelDescr = 
+    //cudaCreateChannelDesc(64,0,0,0,cudaChannelFormatKindFloat);
     
     size_t offset = size_t(-1);
     cudaSafeCall(cudaBindTexture(&offset, texd2, d_array));
   }
 
-  void bindUIntTexture2(uint* d_array, uint size){
+  void bindUIntTexture2(uint* d_array, int size){
     cudaChannelFormatDesc channelDescr = 
       cudaCreateChannelDesc(32,0,0,0,cudaChannelFormatKindUnsigned);
 
     cudaSafeCall(cudaBindTexture(0, &texui2, d_array, &channelDescr, 
-				 size*sizeof(uint)));
+                                 size*sizeof(uint)));
+  }
+
+  void bindIntTexture2(int* d_array, int size){
+    cudaChannelFormatDesc channelDescr = 
+      cudaCreateChannelDesc(32,0,0,0,cudaChannelFormatKindUnsigned);
+
+    cudaSafeCall(cudaBindTexture(0, &texi2, d_array, &channelDescr, 
+                                 size*sizeof(int)));
   }
 
 
   void unbindTexture2(){
     cudaSafeCall(cudaUnbindTexture(&texf2));
     cudaSafeCall(cudaUnbindTexture(&texui2));
+    cudaSafeCall(cudaUnbindTexture(&texi2));
     cudaSafeCall(cudaUnbindTexture(&texd2));
   }
 
   template<class T, int TEX> class TEXTURE{
   public:
     static __inline__ __device__ T fetch_vec2(const int& index, 
-					      const int& offset, 
-					      const T* array,
-					      const uint* column_indices);
+                                              const int& offset, 
+                                              const T* array,
+                                              const int* column_indices);
   };
   
   template<int TEX> class TEXTURE<double, TEX>{
   public:
     static __inline__ __device__ double fetch_vec2(const int& index,
-						   const int& offset,
-						   const double* array,
-						   const uint* column_indices){
+                                                   const int& offset,
+                                                   const double* array,
+                                                   const int* column_indices){
       if(TEX == 0){
-	return array[column_indices[index]+offset];
+        return array[column_indices[index]+offset];
       }else if(TEX == 1){
 #if __CUDA_ARCH__ >= 130
-	int2 dd = tex1Dfetch(texd2, column_indices[index]+offset);
-	return __hiloint2double(dd.y, dd.x);
+        int2 dd = tex1Dfetch(texd2, column_indices[index]+offset);
+        return __hiloint2double(dd.y, dd.x);
 #else
-	return array[column_indices[index]+offset];
+        return array[column_indices[index]+offset];
 #endif
       }else if(TEX == 3){
 #if __CUDA_ARCH__ >= 130
-	int2 dd = tex1Dfetch(texd2, tex1Dfetch(texui2, index)+offset);
-	return __hiloint2double(dd.y, dd.x);
+        int2 dd = tex1Dfetch(texd2, tex1Dfetch(texui2, index)+offset);
+        return __hiloint2double(dd.y, dd.x);
 #else
-	return array[tex1Dfetch(texui2, index)+offset];
+        return array[tex1Dfetch(texui2, index)+offset];
 #endif
       }else{
-	return 0;
+        return 0;
       }
     }
   };
@@ -106,17 +116,17 @@ namespace CGF{
   template<int TEX> class TEXTURE<float, TEX>{
   public:
     static __inline__ __device__ float fetch_vec2(const int& index,
-						  const int& offset,
-						  const float* array,
-						  const uint* column_indices){
+                                                  const int& offset,
+                                                  const float* array,
+                                                  const int* column_indices){
       if(TEX==0){
-	return array[column_indices[index]+offset];
+        return array[column_indices[index]+offset];
       }else if(TEX == 1){
-	return tex1Dfetch(texf2, column_indices[index]+offset);
+        return tex1Dfetch(texf2, column_indices[index]+offset);
       }else if(TEX == 2){
-	return tex1Dfetch(texf2, tex1Dfetch(texui2, index)+offset);
+        return tex1Dfetch(texf2, tex1Dfetch(texui2, index)+offset);
       }else{
-	return 0;
+        return 0;
       }
     }
   };
@@ -139,21 +149,21 @@ namespace CGF{
     array lookup can be done, which is faster in these cases*/
   template<int N, class T, int N_THR, int TEX>
   __global__ void cuda_spmv_ordered2(T* d_blocks, 
-				     unsigned int* d_col_indices,
-				     unsigned int* d_row_lengths, 
-				     unsigned int* d_row_indices,
-				     unsigned int* d_row_map,
-				     const T* d_b,
-				     T* d_res,
-				     unsigned int dim, unsigned int n_blocks){
+                                     int* d_col_indices,
+                                     int* d_row_lengths, 
+                                     int* d_row_indices,
+                                     int* d_row_map,
+                                     const T* d_b,
+                                     T* d_res,
+                                     int dim, int n_blocks){
     __shared__ T     blocks[N_THR];
 
-    uint  row_lengths;
-    uint  row_index;
+    int  row_lengths;
+    int  row_index;
 
-    uint thread_id = TY * N + TX;
-    uint block_index   = (TY%N) * N + TX;    
-    uint cuda_block_id = (BY * gridDim.x + BX);
+    int thread_id = TY * N + TX;
+    int block_index   = (TY%N) * N + TX;    
+    int cuda_block_id = (BY * gridDim.x + BX);
 
     if(cuda_block_id >= n_blocks)
       return;
@@ -177,21 +187,21 @@ namespace CGF{
 
     blocks[thread_id] = 0;
     
-    for(uint i=0;i<row_lengths;i++){
-      uint block_id = row_index + (N_THR/(N*N)) * i + TY/N;
+    for(int i=0;i<row_lengths;i++){
+      int block_id = row_index + (N_THR/(N*N)) * i + TY/N;
       /*GTX280 N==1 -> Vector texture
-               N==2 -> Vector texture
-	       N==4 -> Double texture
-	       N==8 -> Double texture
+        N==2 -> Vector texture
+        N==4 -> Double texture
+        N==8 -> Double texture
 	       
-	GTX570 N==1 -> Vector texture
-	       N==2 -> Vector texture
-	       N==4 -> Vector texture
-	       N==8 -> Vector texture
+        GTX570 N==1 -> Vector texture
+        N==2 -> Vector texture
+        N==4 -> Vector texture
+        N==8 -> Vector texture
       */
       blocks[thread_id] += 
-	d_blocks[block_id*N*N + block_index]* 
-	TEXTURE<T, TEX>::fetch_vec2(block_id, TX, d_b, d_col_indices);
+        d_blocks[block_id*N*N + block_index]* 
+        TEXTURE<T, TEX>::fetch_vec2(block_id, TX, d_b, d_col_indices);
     }
 
     //__syncthreads();
@@ -207,22 +217,22 @@ namespace CGF{
 #endif
 
 #if 0
-else{
+    else{
       volatile T* vb = blocks;
       
       int offset = N*N;
       int nn = 1;
       while(nn != nx){
-	if(thread_id + offset < N_THR){
-	  vb[thread_id] += vb[thread_id + offset];
-	}
+        if(thread_id + offset < N_THR){
+          vb[thread_id] += vb[thread_id + offset];
+        }
 
-	if(offset > 32){
-	  __syncthreads();
-	}
+        if(offset > 32){
+          __syncthreads();
+        }
 	
-	offset *= 2;
-	nn *= 2;
+        offset *= 2;
+        nn *= 2;
       }
     }
 #else
@@ -233,79 +243,79 @@ else{
     if(nx == 2){
       /*Add block 1 to 0, 3 to 2*/
       if(row%nx == 0){
-	blocks[thread_id] += blocks[thread_id + N*N];
+        blocks[thread_id] += blocks[thread_id + N*N];
       }
     }else if(nx == 4){
       if(row%nx == 0){
-	blocks[thread_id] += 
-	  blocks[thread_id + N*N*1] +
-	  blocks[thread_id + N*N*2] +
-	  blocks[thread_id + N*N*3];
+        blocks[thread_id] += 
+          blocks[thread_id + N*N*1] +
+          blocks[thread_id + N*N*2] +
+          blocks[thread_id + N*N*3];
       }
     }else if(nx == 8){
       if(row%nx == 0){
-	blocks[thread_id] += 
-	  blocks[thread_id + N*N*1] +
-	  blocks[thread_id + N*N*2] +
-	  blocks[thread_id + N*N*3] +
-	  blocks[thread_id + N*N*4] +
-	  blocks[thread_id + N*N*5] +
-	  blocks[thread_id + N*N*6] +
-	  blocks[thread_id + N*N*7];
+        blocks[thread_id] += 
+          blocks[thread_id + N*N*1] +
+          blocks[thread_id + N*N*2] +
+          blocks[thread_id + N*N*3] +
+          blocks[thread_id + N*N*4] +
+          blocks[thread_id + N*N*5] +
+          blocks[thread_id + N*N*6] +
+          blocks[thread_id + N*N*7];
       }
     }else if(nx == 16){
       if(row%nx == 0){
-	blocks[thread_id] += 
-	  blocks[thread_id + N*N*1] +
-	  blocks[thread_id + N*N*2] +
-	  blocks[thread_id + N*N*3] +
-	  blocks[thread_id + N*N*4] +
-	  blocks[thread_id + N*N*5] +
-	  blocks[thread_id + N*N*6] +
-	  blocks[thread_id + N*N*7] +
-	  blocks[thread_id + N*N*8] +
-	  blocks[thread_id + N*N*9] +
-	  blocks[thread_id + N*N*10] +
-	  blocks[thread_id + N*N*11] +
-	  blocks[thread_id + N*N*12] +
-	  blocks[thread_id + N*N*13] +
-	  blocks[thread_id + N*N*14] +
-	  blocks[thread_id + N*N*15];
+        blocks[thread_id] += 
+          blocks[thread_id + N*N*1] +
+          blocks[thread_id + N*N*2] +
+          blocks[thread_id + N*N*3] +
+          blocks[thread_id + N*N*4] +
+          blocks[thread_id + N*N*5] +
+          blocks[thread_id + N*N*6] +
+          blocks[thread_id + N*N*7] +
+          blocks[thread_id + N*N*8] +
+          blocks[thread_id + N*N*9] +
+          blocks[thread_id + N*N*10] +
+          blocks[thread_id + N*N*11] +
+          blocks[thread_id + N*N*12] +
+          blocks[thread_id + N*N*13] +
+          blocks[thread_id + N*N*14] +
+          blocks[thread_id + N*N*15];
       }
     }else if(nx == 32){
       if(row%nx == 0){
-	blocks[thread_id] += 
-	  blocks[thread_id + N*N*1] +
-	  blocks[thread_id + N*N*2] +
-	  blocks[thread_id + N*N*3] +
-	  blocks[thread_id + N*N*4] +
-	  blocks[thread_id + N*N*5] +
-	  blocks[thread_id + N*N*6] +
-	  blocks[thread_id + N*N*7] +
-	  blocks[thread_id + N*N*8] +
-	  blocks[thread_id + N*N*9] +
-	  blocks[thread_id + N*N*10] +
-	  blocks[thread_id + N*N*11] +
-	  blocks[thread_id + N*N*12] +
-	  blocks[thread_id + N*N*13] +
-	  blocks[thread_id + N*N*14] +
-	  blocks[thread_id + N*N*15] +
-	  blocks[thread_id + N*N*16] +
-	  blocks[thread_id + N*N*17] +
-	  blocks[thread_id + N*N*18] +
-	  blocks[thread_id + N*N*19] +
-	  blocks[thread_id + N*N*20] +
-	  blocks[thread_id + N*N*21] +
-	  blocks[thread_id + N*N*22] +
-	  blocks[thread_id + N*N*23] +
-	  blocks[thread_id + N*N*24] +
-	  blocks[thread_id + N*N*25] +
-	  blocks[thread_id + N*N*26] +
-	  blocks[thread_id + N*N*27] +
-	  blocks[thread_id + N*N*28] +
-	  blocks[thread_id + N*N*29] +
-	  blocks[thread_id + N*N*30] +
-	  blocks[thread_id + N*N*31];
+        blocks[thread_id] += 
+          blocks[thread_id + N*N*1] +
+          blocks[thread_id + N*N*2] +
+          blocks[thread_id + N*N*3] +
+          blocks[thread_id + N*N*4] +
+          blocks[thread_id + N*N*5] +
+          blocks[thread_id + N*N*6] +
+          blocks[thread_id + N*N*7] +
+          blocks[thread_id + N*N*8] +
+          blocks[thread_id + N*N*9] +
+          blocks[thread_id + N*N*10] +
+          blocks[thread_id + N*N*11] +
+          blocks[thread_id + N*N*12] +
+          blocks[thread_id + N*N*13] +
+          blocks[thread_id + N*N*14] +
+          blocks[thread_id + N*N*15] +
+          blocks[thread_id + N*N*16] +
+          blocks[thread_id + N*N*17] +
+          blocks[thread_id + N*N*18] +
+          blocks[thread_id + N*N*19] +
+          blocks[thread_id + N*N*20] +
+          blocks[thread_id + N*N*21] +
+          blocks[thread_id + N*N*22] +
+          blocks[thread_id + N*N*23] +
+          blocks[thread_id + N*N*24] +
+          blocks[thread_id + N*N*25] +
+          blocks[thread_id + N*N*26] +
+          blocks[thread_id + N*N*27] +
+          blocks[thread_id + N*N*28] +
+          blocks[thread_id + N*N*29] +
+          blocks[thread_id + N*N*30] +
+          blocks[thread_id + N*N*31];
       }
     }
 #endif
@@ -324,71 +334,71 @@ else{
 #ifdef EXT
     }
 #endif
-  //__syncthreads();
-  //if(thread_id < (SIMB/NX)*N){
-  //orig_row = orig_row * N + thread_id;
-  //d_res[orig_row] = blocks[TY/N];
-  //}
+    //__syncthreads();
+    //if(thread_id < (SIMB/NX)*N){
+    //orig_row = orig_row * N + thread_id;
+    //d_res[orig_row] = blocks[TY/N];
+    //}
 #endif
   }
 
   template<int N, class T, int N_THR>
   void CUDASPMV<N, T, N_THR>::spmv_ordered(T* d_blocks, 
-					   uint* d_col_indices, 
-					   uint* d_row_lengths, 
-					   uint* d_row_indices,
-					   uint* d_row_map,
-					   const T* d_b, T* d_x, uint dim, 
-					   uint n_blocks, 
-					   TextureOperation tex_op){
-    uint n_cuda_blocks;
-    uint nx = (NX>(N_THR/(N*N)))?(N_THR/(N*N)):NX;
+                                           int* d_col_indices, 
+                                           int* d_row_lengths, 
+                                           int* d_row_indices,
+                                           int* d_row_map,
+                                           const T* d_b, T* d_x, int dim, 
+                                           int n_blocks, 
+                                           TextureOperation tex_op){
+    int n_cuda_blocks;
+    int nx = (NX>(N_THR/(N*N)))?(N_THR/(N*N)):NX;
     dim *= N;
     if((dim/N)%((N_THR/(N*N))/nx) != 0){
       n_cuda_blocks = 1+(dim/N)/((N_THR/(N*N))/nx);
     }else{
       /*If NTHREADS=32, N=2, NX=2, dim = 16 -> dim/N = 8, SIMB=8,
-	SIMB/NX=4, n_cuda_blocks = 2*/
+        SIMB/NX=4, n_cuda_blocks = 2*/
       n_cuda_blocks = (dim/N)/((N_THR/(N*N))/nx);
     }
 
     dim3 threads(N, N*(N_THR/(N*N)));
     dim3 grid(n_cuda_blocks);
     if(n_cuda_blocks > 65535){
-      grid.x = ceil(sqrt(n_cuda_blocks));
-      grid.y = ceil(sqrt(n_cuda_blocks));
+      grid.x = (int)ceil(sqrt((float)n_cuda_blocks));
+      grid.y = (int)ceil(sqrt((float)n_cuda_blocks));
     }
 
     if(tex_op == TexNone){
       cuda_spmv_ordered2<N, T, N_THR, 0><<<grid, threads>>>(d_blocks, 
-							    d_col_indices, 
-							    d_row_lengths, 
-							    d_row_indices, 
-							    d_row_map,
-							    d_b, 
-							    d_x, 
-							    dim, 
-							    n_cuda_blocks);
+                                                            d_col_indices, 
+                                                            d_row_lengths, 
+                                                            d_row_indices, 
+                                                            d_row_map,
+                                                            d_b, 
+                                                            d_x, 
+                                                            dim, 
+                                                            n_cuda_blocks);
     }else if(tex_op == TexVector){
       cuda_spmv_ordered2<N, T, N_THR, 1><<<grid, threads>>>(d_blocks, 
-							    d_col_indices, 
-							    d_row_lengths, 
-							    d_row_indices, 
-							    d_row_map,
-							    d_b, 
-							    d_x, 
-							    dim, 
-							    n_cuda_blocks);
+                                                            d_col_indices, 
+                                                            d_row_lengths, 
+                                                            d_row_indices, 
+                                                            d_row_map,
+                                                            d_b, 
+                                                            d_x, 
+                                                            dim, 
+                                                            n_cuda_blocks);
     }else if(tex_op == TexVectorAndIndices){
       cuda_spmv_ordered2<N, T, N_THR, 2><<<grid, threads>>>(d_blocks, 
-							    d_col_indices, 
-							    d_row_lengths, 
-							    d_row_indices, 
-							    d_row_map,
-							    d_b, 
-							    d_x, 
-							    dim, 
-							    n_cuda_blocks);
+                                                            d_col_indices, 
+                                                            d_row_lengths, 
+                                                            d_row_indices, 
+                                                            d_row_map,
+                                                            d_b, 
+                                                            d_x, 
+                                                            dim, 
+                                                            n_cuda_blocks);
     }
     
     cudaCheckError("Kernel launch cuda_spmv_ordered");

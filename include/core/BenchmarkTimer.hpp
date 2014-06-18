@@ -33,8 +33,8 @@ namespace CGF{
   struct _timer{
     struct timeval total_time;
     struct timeval last_time;
-    uint n;
-    uint state;
+    int n;
+    int state;
   };
 
 
@@ -46,11 +46,11 @@ namespace CGF{
 
     void start(const char* timerName);
     void stop(const char* timerName);
-    ulong getAverageTimeUSec(const char* timerName);
-    ulong getTotalTimeUSec(const char* timerName);
-    ulong getTotalCalls(const char* timerName);
+    long getAverageTimeUSec(const char* timerName);
+    long getTotalTimeUSec(const char* timerName);
+    long getTotalCalls(const char* timerName);
 
-    ulong getAccumulativeUSec();
+    long getAccumulativeUSec();
 
     void printAverageUSec(const char* timerName);
     void printTotalUSec(const char* timerName);
@@ -60,6 +60,10 @@ namespace CGF{
 
     void printAccumulativeUSec();
 
+    void resetTimers(){
+      timeMap.clear();
+    }
+
   protected:
     std::map<std::string, timer>  timeMap;
     
@@ -67,14 +71,14 @@ namespace CGF{
     BenchmarkTimer(const BenchmarkTimer&);
     BenchmarkTimer& operator=(const BenchmarkTimer&);
   };
-
+  
 #ifdef BENCHMARK
-#define TIME(timer, name, call)			\
-  timer.start(name);				\
-  call;						\
-  timer.stop(name);				
+#define TIME(timer, name, call)     \
+  timer.start(name);                \
+  call;                             \
+  timer.stop(name);             
 #else
-#define TIME(timer, name, call)			\
+#define TIME(timer, name, call)                 \
   call;
 #endif
 }

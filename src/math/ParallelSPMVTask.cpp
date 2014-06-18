@@ -28,14 +28,14 @@ namespace CGF{
 
   template<int N, class T>
   ParallelSPMVTask<N, T>::ParallelSPMVTask(const ThreadPool* pool,
-					   const SpMatrix<N, T>* const _mat,
-					   Vector<T>* const _r, 
-					   const Vector<T>* const _x):
+                                           const SpMatrix<N, T>* const _mat,
+                                           Vector<T>* const _r, 
+                                           const Vector<T>* const _x):
     Task(pool->getSize()),mat(_mat),x(_x), r(_r){
     
     mRange   = new MatrixRange[n_threads];
     vRange   = new VectorRange[n_threads];
-    n_blocks = new uint[n_threads];
+    n_blocks = new int[n_threads];
 
     mat->computeBlockDistribution(mRange, vRange, n_blocks,  n_threads);
 

@@ -39,7 +39,7 @@ namespace CGF{
   class CGFAPI ParallelSPMVTask : public Task{
   public:
     ParallelSPMVTask(const ThreadPool* pool, const SpMatrix<N, T>* const mat,
-		     Vector<T>* const _r = 0, const Vector<T>* const _x = 0);
+                     Vector<T>* const _r = 0, const Vector<T>* const _x = 0);
     virtual ~ParallelSPMVTask();
     void setVectors(Vector<T>* const _r, const Vector<T>* const _x){
       x = _x;
@@ -55,7 +55,7 @@ namespace CGF{
     
     MatrixRange* mRange;
     VectorRange* vRange;
-    uint* n_blocks;
+    int* n_blocks;
     BenchmarkTimer* timers;
   };
 }

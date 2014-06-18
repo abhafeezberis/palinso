@@ -7,10 +7,10 @@
    modify, merge, publish, distribute, sublicense, and/or sell copies
    of the Software, and to permit persons to whom the Software is
    furnished to do so, subject to the following conditions:
-   
+
    The above copyright notice and this permission notice shall be
    included in all copies or substantial portions of the Software.
-   
+
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -30,7 +30,7 @@ namespace CGF{
   template<int N, class T>
   class LinSolve{
   public:
-    LinSolve(uint d){
+    LinSolve(int d){
       dim = d;
       mat = new SpMatrix<N, T>(dim, dim);
 
@@ -49,13 +49,13 @@ namespace CGF{
 
     virtual ~ LinSolve(){
       if(!externalAllocatedMat)
-	delete mat;
+        delete mat;
       if(!externalAllocatedb)
-	delete b;
+        delete b;
       if(!externalAllocatedx)
-	delete x;
+        delete x;
     }
-    
+
     /*Fuctions for obtaining pointers to A, x, and b*/
     SpMatrix<N, T>* getMatrix(){
       return mat;
@@ -69,27 +69,31 @@ namespace CGF{
       return x;
     }
 
-    uint getDim()const{
+    int getDim()const{
       return dim;
     }
 
-    uint getIterations(){
+    int getIterations(){
       return iterations;
     }
 
     /*Functions for replacing A, x, b by versions allocated elsewhere.
-     Not, if created elsewhere, they should be deleted elsewehere*/
+      Not, if created elsewhere, they should be deleted elsewehere*/
 
     virtual void setb(Vector<T>* vec){
       cgfassert(vec->getSize() == b->getSize());
-      delete b;
+      if(!externalAllocatedb){
+        delete b;
+      }
       b = vec;
       externalAllocatedb = true;
     }
 
     virtual void setx(Vector<T>* vec){
       cgfassert(vec->getSize() == x->getSize());
-      delete x;
+      if(!externalAllocatedx){
+        delete x;
+      }
       x = vec;
       externalAllocatedx = true;
     }
@@ -97,17 +101,19 @@ namespace CGF{
     virtual void setMatrix(SpMatrix<N, T>* m){
       cgfassert(m->getWidth() == mat->getWidth());
       cgfassert(m->getHeight() == mat->getHeight());
-      delete mat;
+      if(!externalAllocatedMat){
+        delete mat;
+      }
       mat = m;
       externalAllocatedMat = true;
     }
 
     virtual void preSolve() = 0;
 
-    virtual void solve(uint steps = 100000, T tolerance = 1E-6) = 0;
-    
+    virtual void solve(int steps = 100000, T tolerance = (T)1E-6) = 0;
+
   protected:
-    uint dim;
+    int dim;
     SpMatrix<N, T>* mat;
     Vector<T>* b;
     Vector<T>* x;
@@ -115,7 +121,7 @@ namespace CGF{
     bool externalAllocatedMat;
     bool externalAllocatedb;
     bool externalAllocatedx;
-    uint iterations;
+    int iterations;
   };
 }
 

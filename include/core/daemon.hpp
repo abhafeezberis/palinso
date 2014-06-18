@@ -26,11 +26,13 @@
 namespace CGF{
 
   int continue_as_daemon_process();
-
+  
   int is_daemon();
-
+  
   void redirect_std_file_descriptors();
-
+  
+  void redirect_std_file_descriptors_null();
+  
 }
 
 #endif/*DAEMON_HPP*/

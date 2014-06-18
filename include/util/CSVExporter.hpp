@@ -54,8 +54,8 @@ namespace CGF{
     FILE* file;
     bool headerWritten;
     std::map<std::string, std::string> valueMap;
-    std::map<uint, std::string> indexMap;
-    uint n_columns;
+    std::map<int, std::string> indexMap;
+    int n_columns;
     
   };  
 }

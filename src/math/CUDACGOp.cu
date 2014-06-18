@@ -32,14 +32,14 @@ namespace CGF{
 #define SIMB (NTHREADS/(N*N))
 #define BPW  (32/(N*N))
 
-  void computeVecConfiguration(uint dim, dim3* grid, dim3* block){
-    uint threads = NTHREADS;
-    uint blocks = 8*30*2;
+  void computeVecConfiguration(int dim, dim3* grid, dim3* block){
+    int threads = NTHREADS;
+    int blocks = 8*30*2;
 
     if(dim < threads){
       blocks = 1;
     }else if(dim < blocks * threads){
-      blocks = ceil((float)dim/(float)threads);
+      blocks = (int)ceil((float)dim/(float)threads);
     }else{
       
     }
@@ -59,10 +59,10 @@ namespace CGF{
   /*tmp2 = v*v*/
   template<class T>
   __global__ void cuda_cg_step_1(const T* d_b, T* d_C,
-				 T* d_r, T* d_v, T* d_w, 
-				 T* d_tmp, T* d_tmp2, unsigned int dim,
-				 unsigned int startRow, T* d_full_vec, 
-				 T* mapped_memory, unsigned int n_threads){
+                                 T* d_r, T* d_v, T* d_w, 
+                                 T* d_tmp, T* d_tmp2, unsigned int dim,
+                                 unsigned int startRow, T* d_full_vec, 
+                                 T* mapped_memory, unsigned int n_threads){
     unsigned int total_threads = gridDim.x * NTHREADS;
     unsigned int tx        = threadIdx.x;
     unsigned int vec_index = NTHREADS * blockIdx.x + tx;
@@ -71,7 +71,7 @@ namespace CGF{
       T r = d_r[vec_index];
       T C = d_C[vec_index];
       if(C != 0){
-	C = T(1.0)/sqrt(abs(d_C[vec_index]));
+        C = T(1.0)/sqrt(abs(d_C[vec_index]));
       }
 
       T w, v;
@@ -87,10 +87,10 @@ namespace CGF{
       d_C[vec_index] = C;
 
       if(d_full_vec != 0){
-	d_full_vec[vec_index + startRow] = v;
+        d_full_vec[vec_index + startRow] = v;
       }
       if(mapped_memory != 0){
-	mapped_memory[vec_index + startRow] = v;
+        mapped_memory[vec_index + startRow] = v;
       }
       
       d_tmp[vec_index]  = w * w;
@@ -102,14 +102,14 @@ namespace CGF{
 
   template<class T>
   void parallel_cg_step_1(const CVector<T>* b, CVector<T>* C,
-			  CVector<T>* r, CVector<T>* v, CVector<T>* w, 
-			  CVector<T>* tmp, CVector<T>* tmp2, 
-			  CVector<T>* full_vec,
-			  T* mapped_memory, uint n_threads, 
-			  const Thread* caller){
-    uint dim = b->getVRange(caller->getId())->range;
-    uint startRow  = b->getVRange(caller->getId())->startBlock;
-    uint tid = caller->getId();
+                          CVector<T>* r, CVector<T>* v, CVector<T>* w, 
+                          CVector<T>* tmp, CVector<T>* tmp2, 
+                          CVector<T>* full_vec,
+                          T* mapped_memory, int n_threads, 
+                          const Thread* caller){
+    int dim = b->getVRange(caller->getId())->range;
+    int startRow  = b->getVRange(caller->getId())->startBlock;
+    int tid = caller->getId();
 
     dim3 threads;
     dim3 grid;
@@ -117,20 +117,20 @@ namespace CGF{
     computeVecConfiguration(dim, &grid, &threads);
 
     cuda_cg_step_1<T><<<grid, threads>>>(b->getData(tid), C->getData(tid), 
-					 r->getData(tid), v->getData(tid), 
-					 w->getData(tid), tmp->getData(tid),
-					 tmp2->getData(tid),
-					 b->getVRange(caller->getId())->range, 
-					 startRow, (full_vec==0)?0:full_vec->getData(tid), 
-					 mapped_memory,
-					 n_threads);
+                                         r->getData(tid), v->getData(tid), 
+                                         w->getData(tid), tmp->getData(tid),
+                                         tmp2->getData(tid),
+                                         b->getVRange(caller->getId())->range, 
+                                         startRow, (full_vec==0)?0:full_vec->getData(tid), 
+                                         mapped_memory,
+                                         n_threads);
 
     cudaCheckError("Kernel launch cuda_cg_step_1");
   }
 
   template<int LP, class T>
   __global__ void cuda_reduction(const T* d_tmp, T* d_tmp2, 
-				 T* mapped, unsigned int dim, bool sq){
+                                 T* mapped, unsigned int dim, bool sq){
     unsigned int bx            = blockIdx.x;
     unsigned int total_threads = gridDim.x * NTHREADS;
     unsigned int vec_index     = NTHREADS * bx;
@@ -161,14 +161,14 @@ namespace CGF{
     if(tx==0){
       d_tmp2[bx] = vector[0];
       if(mapped)
-	mapped[0] = vector[0];
+        mapped[0] = vector[0];
     }
   }
 
   template<int LP, class T>
   __global__ void cuda_reduction2(const T* d_tmp, T* d_tmp2, 
-				  T* mapped, unsigned int dim, 
-				  unsigned int n_blocks){
+                                  T* mapped, unsigned int dim, 
+                                  unsigned int n_blocks){
     unsigned int block_index = blockIdx.y * gridDim.x + blockIdx.x;
     unsigned int tx          = threadIdx.x;
     unsigned int vec_index   = block_index * NTHREADS * LP + tx;
@@ -182,10 +182,10 @@ namespace CGF{
     if(vec_index + LP * NTHREADS < dim ){
       vector[tx] = sum_load_vector<LP>(d_tmp, vec_index, NTHREADS);
     }else{
-      for(uint i=0;i<LP;i++){
-	if(vec_index + i * NTHREADS < dim){
-	  vector[tx] += d_tmp[vec_index + i * NTHREADS];
-	}
+      for(int i=0;i<LP;i++){
+        if(vec_index + i * NTHREADS < dim){
+          vector[tx] += d_tmp[vec_index + i * NTHREADS];
+        }
       }
     }
 
@@ -198,20 +198,20 @@ namespace CGF{
     if(tx==0){
       d_tmp2[block_index] = vector[0];
       if(mapped && gridDim.x == 1 && block_index == 0)
-	mapped[0] = vector[0];
+        mapped[0] = vector[0];
     }
   }
 
   template<class T>
   void parallel_reduction(const CVector<T>* vector, CVector<T>* tmp, T** res, 
-			  T* mapped, const Thread* caller){
+                          T* mapped, const Thread* caller){
     /*tmp is a temporary scratch vector on the device.*/
 
-    uint tid = 0;
+    int tid = 0;
     if(caller)
       tid = caller->getId();
 
-    uint dim = vector->getVRange(tid)->range;
+    int dim = vector->getVRange(tid)->range;
     if(vector->getVRange(tid)->startBlock == 
        vector->getVRange(tid)->endBlock){
       /*Size is zero*/
@@ -224,10 +224,11 @@ namespace CGF{
     T* ttmp_b = ttmp_a + (tmp->getVRange(tid)->range / 2);
 
     /*Pass 1*/
-    computeVecConfiguration(ceil((float)dim/(float)R_LOOP), &grid, &threads);
+    computeVecConfiguration((int)ceil((float)dim/(float)R_LOOP), 
+                            &grid, &threads);
 
     cuda_reduction<R_LOOP, T><<<grid, threads>>>(vector->getData(tid), 
-						 ttmp_b, 0, dim, true);
+                                                 ttmp_b, 0, dim, true);
     cudaCheckError("Kernel launch cuda_reduction pass 1");
 
     threads2.x = NTHREADS;
@@ -236,7 +237,7 @@ namespace CGF{
 
     /*Pass 2*/
     cuda_reduction<R_LOOP, T><<<grid2, threads2>>>(ttmp_b, ttmp_a, 
-						   mapped, grid.x, false);
+                                                   mapped, grid.x, false);
     cudaCheckError("Kernel launch cuda_reduction pass 2");
     *res = ttmp_a;
 
@@ -249,59 +250,59 @@ namespace CGF{
     /*Pass 3*/
     grid.x = 1;
     cuda_reduction<R_LOOP, T><<<grid, threads2>>>(ttmp_a, ttmp_b, 
-						  mapped, grid2.x, false);
+                                                  mapped, grid2.x, false);
     *res = ttmp_b;
 #endif
   }
   
   template<class T>
   void parallel_reduction2(const CVector<T>* vector, CVector<T>* tmp, T** res, 
-			   T* mapped, const Thread* caller){
+                           T* mapped, const Thread* caller){
     /*tmp is a temporary scratch vector on the device.*/
 
-    uint tid = 0;
+    int tid = 0;
     if(caller)
       tid = caller->getId();
 
-    uint dim = vector->getVRange(tid)->range;
+    int dim = vector->getVRange(tid)->range;
     dim3 threads;
     dim3 grid;
 
     T* ttmp_a = tmp->getData(tid);
     T* ttmp_b = ttmp_a + (tmp->getVRange(tid)->range / 2);
-    uint n_blocks = ceil((float)dim/(float)R_LOOP/(float)NTHREADS);
-    uint pass = 0;
+    int n_blocks = (int)ceil((float)dim/(float)R_LOOP/(float)NTHREADS);
+    int pass = 0;
     T* m = 0;
     while(dim != 1){
       if(n_blocks >= 65536){
-	grid.x = ceil(sqrt(n_blocks));
-	grid.y = ceil(sqrt(n_blocks));
+        grid.x = (int)ceil(Sqrt((float)n_blocks));
+        grid.y = (int)ceil(Sqrt((float)n_blocks));
       }else{
-	grid.x = n_blocks;
+        grid.x = n_blocks;
       }
 
       if(n_blocks == 1){
-	m = mapped;
+        m = mapped;
       }else{
-	m = 0;
+        m = 0;
       }
 
       threads.x = NTHREADS;
       if(pass == 0){
-	cuda_reduction2<R_LOOP, T><<<grid, threads>>>(vector->getData(tid), 
-						      ttmp_b, 
-						      m, dim, n_blocks);
-	cudaCheckError("Kernel launch cuda_reduction pass 1");
+        cuda_reduction2<R_LOOP, T><<<grid, threads>>>(vector->getData(tid), 
+                                                      ttmp_b, 
+                                                      m, dim, n_blocks);
+        cudaCheckError("Kernel launch cuda_reduction pass 1");
       }else{
-	cuda_reduction2<R_LOOP, T><<<grid, threads>>>(ttmp_a, ttmp_b, m, 
-						      dim, n_blocks);
-	cudaCheckError("Kernel launch cuda_reduction pass 2");
+        cuda_reduction2<R_LOOP, T><<<grid, threads>>>(ttmp_a, ttmp_b, m, 
+                                                      dim, n_blocks);
+        cudaCheckError("Kernel launch cuda_reduction pass 2");
       }
       T* tmp = ttmp_b;
       ttmp_b = ttmp_a;
       ttmp_a = tmp;
       dim = n_blocks;
-      n_blocks = ceil((float)dim/(float)R_LOOP/(float)NTHREADS);
+      n_blocks = (int)ceil((float)dim/(float)R_LOOP/(float)NTHREADS);
       pass++;
     }
 
@@ -311,7 +312,7 @@ namespace CGF{
   /*Compute tmp = v * v*/
   template<class T>
   __global__ void cuda_cg_step_2(const T* d_v, 
-				 T* d_tmp, unsigned int dim){
+                                 T* d_tmp, unsigned int dim){
     unsigned int total_threads = gridDim.x * NTHREADS;
     unsigned int tx        = threadIdx.x;
     unsigned int vec_index = NTHREADS * blockIdx.x + tx;
@@ -331,22 +332,22 @@ namespace CGF{
 
   template<class T>
   void parallel_cg_step_2(const CVector<T>* v, CVector<T>* tmp, 
-			  const Thread* caller){ 
-    uint dim = v->getVRange(caller->getId())->range;
+                          const Thread* caller){ 
+    int dim = v->getVRange(caller->getId())->range;
     dim3 threads;
     dim3 grid;
 
     computeVecConfiguration(dim, &grid, &threads);
 
     cuda_cg_step_2<T><<<grid, threads>>>(v->getData(caller->getId()), 
-				      tmp->getData(caller->getId()), dim);
+                                         tmp->getData(caller->getId()), dim);
     cudaCheckError("Kernel launch cuda_cg_step_2");
   }
 
   /*Compute tmp = u * v*/
   template<class T>
   __global__ void cuda_cg_step_3(const T* d_v, const T* d_u, 
-				 T* d_tmp, unsigned int dim){
+                                 T* d_tmp, unsigned int dim){
     unsigned int total_threads = gridDim.x * NTHREADS;
     unsigned int tx        = threadIdx.x;
     unsigned int vec_index = NTHREADS * blockIdx.x + tx;
@@ -363,16 +364,16 @@ namespace CGF{
 
   template<class T>
   void parallel_cg_step_3(const CVector<T>* v, const CVector<T>* u, 
-			  CVector<T>* tmp, const Thread* caller){
-    uint dim = v->getVRange(caller->getId())->range;
+                          CVector<T>* tmp, const Thread* caller){
+    int dim = v->getVRange(caller->getId())->range;
     dim3 threads;
     dim3 grid;
 
     computeVecConfiguration(dim, &grid, &threads);
 
     cuda_cg_step_3<T><<<grid, threads>>>(v->getData(caller->getId()), 
-					 u->getData(caller->getId()), 
-					 tmp->getData(caller->getId()), dim);
+                                         u->getData(caller->getId()), 
+                                         tmp->getData(caller->getId()), dim);
     cudaCheckError("Kernel launch cuda_cg_step_3");
   }
 
@@ -382,9 +383,9 @@ namespace CGF{
   /*tmp = w * w*/
   template<class T>
   __global__ void cuda_cg_step_4(const T* d_v, const T* d_u,
-				 const T* d_C, const T t, 
-				 T* d_w, T* d_x, T* d_r, 
-				 T* d_tmp, unsigned int dim){
+                                 const T* d_C, const T t, 
+                                 T* d_w, T* d_x, T* d_r, 
+                                 T* d_tmp, unsigned int dim){
     unsigned int total_threads = gridDim.x * NTHREADS;
     unsigned int tx        = threadIdx.x;
     unsigned int vec_index = NTHREADS * blockIdx.x + tx;
@@ -410,24 +411,24 @@ namespace CGF{
 
   template<class T>
   void parallel_cg_step_4(const CVector<T>* v, const CVector<T>* u, 
-			  const CVector<T>* C, const T t, 
-			  CVector<T>* w, CVector<T>* x, CVector<T>* r, 
-			  CVector<T>* tmp, const Thread* caller){
-    uint dim = x->getVRange(caller->getId())->range;
+                          const CVector<T>* C, const T t, 
+                          CVector<T>* w, CVector<T>* x, CVector<T>* r, 
+                          CVector<T>* tmp, const Thread* caller){
+    int dim = x->getVRange(caller->getId())->range;
     dim3 threads;
     dim3 grid;
 
     computeVecConfiguration(dim, &grid, &threads);
 
     cuda_cg_step_4<T><<<grid, threads>>>(v->getData(caller->getId()), 
-					 u->getData(caller->getId()), 
-					 C->getData(caller->getId()),
-					 t,
-					 w->getData(caller->getId()), 
-					 x->getData(caller->getId()), 
-					 r->getData(caller->getId()), 
-					 tmp->getData(caller->getId()), 
-					 dim);
+                                         u->getData(caller->getId()), 
+                                         C->getData(caller->getId()),
+                                         t,
+                                         w->getData(caller->getId()), 
+                                         x->getData(caller->getId()), 
+                                         r->getData(caller->getId()), 
+                                         tmp->getData(caller->getId()), 
+                                         dim);
 
     cudaCheckError("Kernel launch cuda_cg_step_4");
   }
@@ -437,10 +438,10 @@ namespace CGF{
   /*Fullvec = v*/
   template<class T>
   __global__ void cuda_cg_step_5(const T* d_w, const T* d_C,
-				 const T s, T* d_v, T* d_tmp,
-				 T* d_full_vec, T* mapped_memory,
-				 unsigned int dim, unsigned int startRow,
-				 unsigned int n_threads){
+                                 const T s, T* d_v, T* d_tmp,
+                                 T* d_full_vec, T* mapped_memory,
+                                 unsigned int dim, unsigned int startRow,
+                                 unsigned int n_threads){
 
     unsigned int total_threads = gridDim.x * NTHREADS;
     unsigned int tx        = threadIdx.x;
@@ -454,10 +455,10 @@ namespace CGF{
       d_v[vec_index] = v;
       d_tmp[vec_index] = v * v;
       if(d_full_vec != 0){
-	d_full_vec[vec_index + startRow] = v;
+        d_full_vec[vec_index + startRow] = v;
       }
       if(mapped_memory != 0){
-	mapped_memory[vec_index + startRow] = v;
+        mapped_memory[vec_index + startRow] = v;
       }
       vec_index += total_threads;
     }
@@ -465,136 +466,136 @@ namespace CGF{
 
   template<class T>
   void parallel_cg_step_5(const CVector<T>* w, const CVector<T>* C,
-			  const T s, CVector<T>* v, CVector<T>* tmp,
-			  CVector<T>* full_vec, T* mapped_memory, 
-			  uint n_threads, const Thread* caller){
-    uint dim = v->getVRange(caller->getId())->range;
-    uint startRow = v->getVRange(caller->getId())->startBlock;
+                          const T s, CVector<T>* v, CVector<T>* tmp,
+                          CVector<T>* full_vec, T* mapped_memory, 
+                          int n_threads, const Thread* caller){
+    int dim = v->getVRange(caller->getId())->range;
+    int startRow = v->getVRange(caller->getId())->startBlock;
     dim3 threads;
     dim3 grid;
 
     computeVecConfiguration(dim, &grid, &threads);
 
     cuda_cg_step_5<T><<<grid, threads>>>(w->getData(caller->getId()), 
-					 C->getData(caller->getId()),
-					 s,
-					 v->getData(caller->getId()),
-					 tmp->getData(caller->getId()),
-					 (full_vec == 0)?0:full_vec->getData(caller->getId()),
-					 mapped_memory, 
-					 dim, startRow, 
-					 n_threads);
+                                         C->getData(caller->getId()),
+                                         s,
+                                         v->getData(caller->getId()),
+                                         tmp->getData(caller->getId()),
+                                         (full_vec == 0)?0:full_vec->getData(caller->getId()),
+                                         mapped_memory, 
+                                         dim, startRow, 
+                                         n_threads);
     cudaCheckError("Kernel launch cuda_cg_step_5");
   }
 
   template
   void parallel_reduction<float>(const CVector<float>* vector, 
-				 CVector<float>* tmp, 
-				 float** res, 
-				 float* mapped, const Thread* caller);
+                                 CVector<float>* tmp, 
+                                 float** res, 
+                                 float* mapped, const Thread* caller);
 
   template
   void parallel_reduction2<float>(const CVector<float>* vector, 
-				  CVector<float>* tmp, 
-				  float** res, 
-				  float* mapped, const Thread* caller);
+                                  CVector<float>* tmp, 
+                                  float** res, 
+                                  float* mapped, const Thread* caller);
 
 
   template
   void parallel_cg_step_1<float>(const CVector<float>* b, 
-				 CVector<float>* C,
-				 CVector<float>* r, CVector<float>* v, 
-				 CVector<float>* w, 
-				 CVector<float>* tmp, 
-				 CVector<float>* tmp2, 
-				 CVector<float>* full_vec,
-				 float* mapped_memory, uint n_threads, 
-				 const Thread* caller);
+                                 CVector<float>* C,
+                                 CVector<float>* r, CVector<float>* v, 
+                                 CVector<float>* w, 
+                                 CVector<float>* tmp, 
+                                 CVector<float>* tmp2, 
+                                 CVector<float>* full_vec,
+                                 float* mapped_memory, int n_threads, 
+                                 const Thread* caller);
 
   template
   void parallel_cg_step_2<float>(const CVector<float>* v, 
-				 CVector<float>* tmp, 
-				 const Thread* caller);
+                                 CVector<float>* tmp, 
+                                 const Thread* caller);
 
   template
   void parallel_cg_step_3<float>(const CVector<float>* v, 
-				 const CVector<float>* u, 
-				 CVector<float>* tmp, const Thread* caller);
+                                 const CVector<float>* u, 
+                                 CVector<float>* tmp, const Thread* caller);
 
   template
   void parallel_cg_step_4<float>(const CVector<float>* v, 
-				 const CVector<float>* u, 
-				 const CVector<float>* C, 
-				 const float t, 
-				 CVector<float>* w, 
-				 CVector<float>* x, 
-				 CVector<float>* r, 
-				 CVector<float>* tmp,
-				 const Thread* caller);
+                                 const CVector<float>* u, 
+                                 const CVector<float>* C, 
+                                 const float t, 
+                                 CVector<float>* w, 
+                                 CVector<float>* x, 
+                                 CVector<float>* r, 
+                                 CVector<float>* tmp,
+                                 const Thread* caller);
 
   template
   void parallel_cg_step_5<float>(const CVector<float>* w, 
-				 const CVector<float>* C,
-				 const float s, 
-				 CVector<float>* v, 
-				 CVector<float>* tmp,
-				 CVector<float>* full_vec, 
-				 float* mapped_memory, 
-				 uint n_threads, const Thread* caller);
+                                 const CVector<float>* C,
+                                 const float s, 
+                                 CVector<float>* v, 
+                                 CVector<float>* tmp,
+                                 CVector<float>* full_vec, 
+                                 float* mapped_memory, 
+                                 int n_threads, const Thread* caller);
 
   template
   void parallel_reduction<double>(const CVector<double>* vector, 
-				  CVector<double>* tmp, 
-				  double** res, 
-				  double* mapped, const Thread* caller);
+                                  CVector<double>* tmp, 
+                                  double** res, 
+                                  double* mapped, const Thread* caller);
 
   template
   void parallel_reduction2<double>(const CVector<double>* vector, 
-				  CVector<double>* tmp, 
-				  double** res, 
-				  double* mapped, const Thread* caller);
+                                   CVector<double>* tmp, 
+                                   double** res, 
+                                   double* mapped, const Thread* caller);
 
   template
   void parallel_cg_step_1<double>(const CVector<double>* b, 
-				  CVector<double>* C,
-				  CVector<double>* r, CVector<double>* v, 
-				  CVector<double>* w, 
-				  CVector<double>* tmp, 
-				  CVector<double>* tmp2, 
-				  CVector<double>* full_vec,
-				  double* mapped_memory, uint n_threads, 
-				  const Thread* caller);
+                                  CVector<double>* C,
+                                  CVector<double>* r, CVector<double>* v, 
+                                  CVector<double>* w, 
+                                  CVector<double>* tmp, 
+                                  CVector<double>* tmp2, 
+                                  CVector<double>* full_vec,
+                                  double* mapped_memory, int n_threads, 
+                                  const Thread* caller);
 
   template
   void parallel_cg_step_2<double>(const CVector<double>* v, 
-				  CVector<double>* tmp, 
-				  const Thread* caller);
+                                  CVector<double>* tmp, 
+                                  const Thread* caller);
 
   template
   void parallel_cg_step_3<double>(const CVector<double>* v, 
-				  const CVector<double>* u, 
-				  CVector<double>* tmp, const Thread* caller);
+                                  const CVector<double>* u, 
+                                  CVector<double>* tmp, const Thread* caller);
 
   template
   void parallel_cg_step_4<double>(const CVector<double>* v, 
-				  const CVector<double>* u, 
-				  const CVector<double>* C, 
-				  const double t, 
-				  CVector<double>* w, 
-				  CVector<double>* x, 
-				  CVector<double>* r, 
-				  CVector<double>* tmp,
-				  const Thread* caller);
+                                  const CVector<double>* u, 
+                                  const CVector<double>* C, 
+                                  const double t, 
+                                  CVector<double>* w, 
+                                  CVector<double>* x, 
+                                  CVector<double>* r, 
+                                  CVector<double>* tmp,
+                                  const Thread* caller);
 
   template
   void parallel_cg_step_5<double>(const CVector<double>* w, 
-				  const CVector<double>* C,
-				  const double s, 
-				  CVector<double>* v, 
-				  CVector<double>* tmp,
-				  CVector<double>* full_vec, 
-				  double* mapped_memory, 
-				  uint n_threads, const Thread* caller);
+                                  const CVector<double>* C,
+                                  const double s, 
+                                  CVector<double>* v, 
+                                  CVector<double>* tmp,
+                                  CVector<double>* full_vec, 
+                                  double* mapped_memory, 
+                                  int n_threads, const Thread* caller);
 
 }
 

@@ -20,6 +20,7 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. */
 
+#ifdef USE_THREADS
 #include <iostream>
 #include "core/ThreadPool.hpp"
 #include "core/Timer.hpp"
@@ -27,18 +28,18 @@
 #include "core/Exception.hpp"
 #include <stdlib.h>
 #include <unistd.h>
+#endif
 
 namespace CGF{
-
+#ifdef USE_THREADS
   ThreadPool::ThreadPool(){
-    uint i;
     n_threads = DEFAULT_N_THREADS;
     n_blocked_threads = 0;
 
     barrier = new Barrier(this);
     threads = new Thread*[n_threads];
     
-    for(i=0;i<n_threads;i++){
+    for(int i=0;i<n_threads;i++){
       threads[i] = new Thread(i);
       threads[i]->setBarrier(barrier);
       threads[i]->setLastId(n_threads);
@@ -54,15 +55,14 @@ namespace CGF{
     //message("Threadpool created with %d threads", n_threads);
   }
 
-  ThreadPool::ThreadPool(uint n){
-    uint i;
+  ThreadPool::ThreadPool(int n){
     n_threads = n;
     n_blocked_threads = 0;
 
     barrier = new Barrier(this);
     threads = new Thread*[n_threads];
     
-    for(i=0;i<n_threads;i++){
+    for(int i=0;i<n_threads;i++){
       threads[i] = new Thread(i);
       threads[i]->setBarrier(barrier);
       threads[i]->setLastId(n_threads);
@@ -86,7 +86,7 @@ namespace CGF{
     assignTask(t, SHUTDOWN_TASK);
     
     /*Join threads*/
-    for(uint i=0;i<n_threads;i++){
+    for(int i=0;i<n_threads;i++){
       uint* thread_return;
       pthread_join(threads[i]->thread_id, (void**)&thread_return);
     }
@@ -96,7 +96,7 @@ namespace CGF{
 
     delete t;
 
-    for(uint i=0;i<n_threads;i++){
+    for(int i=0;i<n_threads;i++){
       delete threads[i];
       threads[i] = 0;
     }
@@ -119,8 +119,7 @@ namespace CGF{
   }
 
   void ThreadPool::start(){
-    uint i = 0;
-    for(i=0;i<n_threads;i++){
+    for(int i=0;i<n_threads;i++){
       threads[i]->start();
     }
   } 
@@ -142,7 +141,7 @@ namespace CGF{
     if(taskQueue.empty()){
       pthread_mutex_unlock(&queueMutex);
       /*The task queue is empty, let the threads wait and signal the
-	main thread which might requested a synchronization*/
+        main thread which might requested a synchronization*/
       pthread_cond_signal(&syncCondition);
       pthread_cond_wait(&condition, &condMutex);
     }else{
@@ -165,8 +164,8 @@ namespace CGF{
       curTask.task->setSubTask(curTask.subTask);
 
       /*Assign a new task to each thread*/
-      for(uint i=0;i<n_threads;i++){
-	threads[i]->setTask(curTask.task);
+      for(int i=0;i<n_threads;i++){
+        threads[i]->setTask(curTask.task);
       }
 
       /*Wake up all other threads*/
@@ -178,13 +177,13 @@ namespace CGF{
     pthread_mutex_unlock(&blockMutex);
   }
 
-  void ThreadPool::assignTask(Task* task, uint t){
+  void ThreadPool::assignTask(Task* task, int t){
     pthread_mutex_lock(&condMutex);
     pthread_mutex_lock(&blockMutex);
 
     if(task->getNumberOfThreads() != n_threads){
       throw ThreadPoolException(__LINE__, __FILE__, 
-				"Task number of threads mismatch number of threads in selected pool");
+                                "Task number of threads mismatch number of threads in selected pool");
     }
 
     task_t ts;
@@ -250,4 +249,5 @@ namespace CGF{
     pthread_mutex_unlock(&queueMutex);
     message("Faulty task %p removed from task queue", task);
   }
+#endif
 }

@@ -7,10 +7,10 @@
    modify, merge, publish, distribute, sublicense, and/or sell copies
    of the Software, and to permit persons to whom the Software is
    furnished to do so, subject to the following conditions:
-   
+
    The above copyright notice and this permission notice shall be
    included in all copies or substantial portions of the Software.
-   
+
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -21,7 +21,6 @@
    SOFTWARE. */
 
 #ifdef CUDA
-#include <cuda_runtime.h>
 #include "math/ParallelCGCudaTask.hpp"
 #include "core/Thread.hpp"
 #include "util/cuda_util.hpp"
@@ -40,13 +39,13 @@ namespace CGF{
 
   //#define TOL 1e-8
   template<int N, class T>
-  ParallelCGCudaTask<N, T>::ParallelCGCudaTask(const ThreadPool* _pool, 
-					       Vector<T>* const _x, 
-					       const SpMatrix<N, T>* const _mat, 
-					       const Vector<T>* const _b,
-					       int n_thr, TextureOperation tex)
-    : Task(_pool->getSize()), pool(_pool), x(_x), mat(_mat), b(_b), 
-      n_cuda_threads(n_thr), texture(tex), tolerance(1e-6), 
+  ParallelCGCudaTask<N, T>::ParallelCGCudaTask(const ThreadPool* _pool,
+                                               Vector<T>* const _x,
+                                               const SpMatrix<N, T>* const _mat,
+                                               const Vector<T>* const _b,
+                                               int n_thr, TextureOperation tex)
+    : Task(_pool->getSize()), pool(_pool), x(_x), mat(_mat), b(_b),
+      n_cuda_threads(n_thr), texture(tex), tolerance((T)1e-6),
       maxIterations(100000){
 
     //init_cuda_host_thread();
@@ -56,7 +55,7 @@ namespace CGF{
     r = new Vector<T>(*x);
     C = new Vector<T>(*x);
     /*Clear x vector*/
-    for(uint i=0;i<x->getSize();i++){
+    for(int i=0;i<x->getSize();i++){
       (*r)[i] = 0;
       (*C)[i] = 1;
     }
@@ -71,20 +70,20 @@ namespace CGF{
     ctmp1         = new CVector<T>(x, pool);
     ctmp2         = new CVector<T>(x, pool);
     ctmp3         = new CVector<T>(x, pool);
-    uint red_size = x->getSize();
-    crtmp1        = new CVector<T>(red_size/*minTempReductionSize(x->getSize(), 
-					     n_threads)*/, pool);
-    crtmp2        = new CVector<T>(red_size/*minTempReductionSize(x->getSize(), 
-					     n_threads)*/, pool);
-    crtmp3        = new CVector<T>(red_size/*minTempReductionSize(x->getSize(), 
-					     n_threads)*/, pool);
+    int red_size = x->getSize();
+    crtmp1        = new CVector<T>(red_size/*minTempReductionSize(x->getSize(),
+                                             n_threads)*/, pool);
+    crtmp2        = new CVector<T>(red_size/*minTempReductionSize(x->getSize(),
+                                             n_threads)*/, pool);
+    crtmp3        = new CVector<T>(red_size/*minTempReductionSize(x->getSize(),
+                                             n_threads)*/, pool);
     cfull_vec     = new CVector<T>(x, pool, true);
 
     ctmp1->setReductionBuffer(crtmp1);
     ctmp2->setReductionBuffer(crtmp2);
     ctmp3->setReductionBuffer(crtmp3);
-    
-    k             = new uint[n_threads];
+
+    k             = new int[n_threads];
   }
 
   template<int N, class T>
@@ -108,7 +107,7 @@ namespace CGF{
     delete cfull_vec;
 
     delete cmat;
-    
+
     delete[] k;
   }
 
@@ -125,7 +124,7 @@ namespace CGF{
     cgfassert(vec->getSize() == x->getSize());
     x = vec;
     delete cx;
-    cx = new CVector<T>(x, pool);    
+    cx = new CVector<T>(x, pool);
   }
 
   template<int N, class T>
@@ -141,21 +140,27 @@ namespace CGF{
     if(cmat->getMRange(TID)->range == 0)
       return;
 
+    if(TID == 0){
+      Vector<T>::mul(*r, *b, *b);
+      bnorm = Sqrt(r->sum());
+    }
+    caller->sync();
+
     switch(subTask){
     case Allocate:
 #if 1
       try{
-	/*Try to allocate all the memory needed. If this fails,
-	  deallocate and throw an exception*/
-	allocate(caller);
+        /*Try to allocate all the memory needed. If this fails,
+          deallocate and throw an exception*/
+        allocate(caller);
       }catch(CUDAException& e){
-	std::cerr << e.getError();
-	valid = false;
-	deallocate(caller);
-	throw;
+        std::cerr << e.getError();
+        valid = false;
+        deallocate(caller);
+        throw;
       }catch(Exception& e){
-	std::cerr << e.getError();
-	throw;
+        std::cerr << e.getError();
+        throw;
       }
 #else
       allocate(caller);
@@ -183,7 +188,7 @@ namespace CGF{
     caller->setCuda();
 
     cmat->     allocateDevice(caller);
- 
+
     cb->       allocateDevice(caller);
     cx->       allocateDevice(caller);
     cu->       allocateDevice(caller);
@@ -227,17 +232,17 @@ namespace CGF{
 
   template<int N, class T>
   void ParallelCGCudaTask<N, T>::copyResult(const Thread* caller){
-    cudaSafeCall(cudaMemcpy(x->data + cx->getVRange(TID)->startBlock, 
-			    cx->getData(TID), 
-			    sizeof(T)*cx->getVRange(TID)->range, 
-			    cudaMemcpyDeviceToHost));
+    cudaSafeCall(cudaMemcpy(x->data + cx->getVRange(TID)->startBlock,
+                            cx->getData(TID),
+                            sizeof(T)*(uint)cx->getVRange(TID)->range,
+                            cudaMemcpyDeviceToHost));
   }
 
   template<int N, class T>
   void ParallelCGCudaTask<N, T>::computePreconditioner(){
-    for(uint i=0;i<x->getSize();i++){
+    for(int i=0;i<x->getSize();i++){
       /*In the first CG kernel, the preconditioner is computed using
-	C, which must be the diagonal of the matrix.*/
+        C, which must be the diagonal of the matrix.*/
       (*C)[i] = (*mat)[i][i];
     }
   }
@@ -252,7 +257,7 @@ namespace CGF{
     if(cmat){
       delete cmat;
     }
-    
+
     /*Allocate memory for device pointers*/
     cmat = new CSpMatrix<N, T>(mat, n_cuda_threads, texture, pool);
     cmat->computeBlockDistribution();
@@ -278,20 +283,19 @@ namespace CGF{
 
   template<int N, class T>
   void ParallelCGCudaTask<N, T>::solveSystem(const Thread* caller){
-    double lalpha = 0;
-    double lbeta = 0;
-    double lresidual = 0;
-    double ldivider = 0;
-    double lr = 0;
-    double ls = 0;
-    
+    T lalpha = 0;
+    T lbeta = 0;
+    T lresidual = 0;
+    T ldivider = 0;
+    T lr = 0;
+    T ls = 0;
+
     cmat->preSpmv(caller);
     //bindTexture(cfull_vec->getData(TID), cmat->getWidth());
     cfull_vec->bindToTexture(caller);
 
     /*r = Ax*/
     cmat->spmv(cres, cfull_vec, caller);
-    //cres->print(caller);
 
     /*r = b - r*/
     /*w = C * r*/
@@ -299,27 +303,23 @@ namespace CGF{
     /*tmp1 = w * w*/
     /*tmp2 = v * v*/
     /*Copy part of v to mapped memory and full_vec*/
-    parallel_cg_step_1<T>(cb, cC, cres, cv, cw,ctmp1, ctmp2, cfull_vec, 
-			  cfull_vec->getMappedData(TID), n_threads, 
-			  caller);
-    //cx->print(caller);
-      
+    parallel_cg_step_1<T>(cb, cC, cres, cv, cw,ctmp1, ctmp2, cfull_vec,
+                          cfull_vec->getMappedData(TID), n_threads,
+                          caller);
+
     lalpha = ctmp1->sum(caller);
 
-    //message("alpha = %10.10e", lalpha);
-    //getchar();
+    lresidual = Sqrt(Fabs(ctmp2->sum(caller)));
 
-    lresidual = sqrt(fabs(ctmp2->sum(caller)));
-    
     k[TID] = 0;
-    
+
     while(k[TID]<maxIterations){
       /*Copy v to host, preparing for multiplication*/
-      if(lresidual<tolerance){
-	if(TID == 0){
-	  message("Succesfull in %d iterations", k[TID]);
-	}
-	return;
+      if(lresidual<(tolerance*bnorm + tolerance)){
+        if(TID == 0){
+          message("Succesfull in %d iterations", k[TID]);
+        }
+        return;
       }
 #if 0
       /*Only if memory mapping is not used*/
@@ -328,62 +328,56 @@ namespace CGF{
 
       /*Distribute changes to other devices*/
       cfull_vec->scatter(caller);
- 
+
       /*After scatter is performed, full_vec for that device is up to date*/
 
       /*Scatter is asynchronous, but the spmv kernel will only start
-	if the copy has been finished.*/
-      //caller->sync();
+        if the copy has been finished.*/
 
       /*u = Av*/
       cmat->spmv(cu, cfull_vec, caller);
 
-      //cfull_vec->print(caller);
-      
-      //getchar();
-
-
       /*tmp1 = u*v*/
       parallel_cg_step_3<T>(cv, cu, ctmp1, caller);
-      
+
       ldivider = ctmp1->sum(caller);
 
       /*t    = alpha / (v*u) */
       T t = lalpha/ldivider;
+
       /*x    = x + tv*/
       /*r    = r - tu*/
       /*w    = C * r*/
       /*tmp2 = w * w*/
-
       parallel_cg_step_4<T>(cv, cu, cC, t, cw, cx, cres, ctmp2, caller);
-      
+
       lbeta = ctmp2->sum(caller);
 
-      ls = (double)lbeta/(double)lalpha;
+      ls = lbeta/lalpha;
       lalpha = lbeta;
 #if 1
-      if(lbeta < tolerance){
-	parallel_cg_step_2<T>(cres, ctmp1, caller);
-	
-	lr = ctmp1->sum(caller);
-	
-	if(lr< tolerance){
-	  if(TID == 0){
-	    message("Succesfull in %d iterations", k[TID]);
-	  }
-	  return;
-	}
+      if(lbeta < (tolerance*bnorm + tolerance)){
+        parallel_cg_step_2<T>(cres, ctmp1, caller);
+
+        lr = ctmp1->sum(caller);
+
+        if(Sqrt(lr) < (tolerance*bnorm + tolerance)){
+          if(TID == 0){
+            message("Succesfull in %d iterations", k[TID]);
+          }
+          return;
+        }
       }
 #endif
 
       /*v    = C*w + sv */
       /*tmp3 = v * v*/
       /*Copy v to full_vec and mapped memory*/
-      parallel_cg_step_5<T>(cw, cC, ls, cv, ctmp3, cfull_vec, 
-			    cfull_vec->getMappedData(TID), 
-			    n_threads, caller);
-       
-      lresidual = sqrt(fabs(ctmp3->sum(caller)));
+      parallel_cg_step_5<T>(cw, cC, ls, cv, ctmp3, cfull_vec,
+                            cfull_vec->getMappedData(TID),
+                            n_threads, caller);
+
+      lresidual = Sqrt(Fabs(ctmp3->sum(caller)));
 
       k[TID]++;
     }

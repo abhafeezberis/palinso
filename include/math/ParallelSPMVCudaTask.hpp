@@ -24,7 +24,7 @@
 #define PARALLELSPMVCUDATASK_HPP
 #ifdef CUDA
 
-#include <cuda_runtime.h>
+#include "math/CUDASpmv.hpp"
 #include "core/Task.hpp"
 #include "core/BenchmarkTimer.hpp"
 #include "math/Math.hpp"
@@ -42,10 +42,10 @@ namespace CGF{
   class CGFAPI ParallelSPMVCudaTask : public Task{
   public:
     ParallelSPMVCudaTask(const ThreadPool* pool, Vector<T>* const x, 
-			 const SpMatrix<N, T>* const mat, 
-			 const Vector<T>* const b,
-			 int n_thr=256, TextureOperation tex=TexVector, 
-			 int d_offset=0);
+                         const SpMatrix<N, T>* const mat, 
+                         const Vector<T>* const b,
+                         int n_thr=256, TextureOperation tex=TexVector, 
+                         int d_offset=0);
     virtual ~ParallelSPMVCudaTask();
 
     virtual void execute(const Thread* caller);
@@ -68,18 +68,18 @@ namespace CGF{
     
 #if 0
     T** d_blocks;
-    uint**  d_col_indices;
-    uint**  d_row_lengths;
-    uint**  d_row_indices;
+    int**  d_col_indices;
+    int**  d_row_lengths;
+    int**  d_row_indices;
     T** d_full_vec;
 #endif
     T** d_res;
 
 #if 0
-    uint* n_blocks;
+    int* n_blocks;
     MatrixRange* mRange;
     VectorRange* vRange;
-    uint* startBlock;
+    int* startBlock;
     T* reductions1;
     T* reductions2;
     T* reductions3;
@@ -93,7 +93,7 @@ namespace CGF{
     T*   pinned_memory;
     T**  mapped_memory;
 
-    uint* k;
+    int* k;
 #endif
     BenchmarkTimer* timers;
     int n_cuda_threads;

@@ -25,16 +25,17 @@
 //#include "util/CSVExporter.hpp"
 #include "core/BenchmarkTimer.hpp"
 #include "core/Exception.hpp"
+#include "math/SpMatrix.hpp"
 
 namespace CGF{
 
 #define TOL 1e-16
 
   template<int N, class T>
-  ParallelBICGSTABTask<N, T>::ParallelBICGSTABTask(const uint _n, 
-						   Vector<T>* const _x, 
-						   const SpMatrix<N, T>* const _mat, 
-						   const Vector<T>* const _b) : 
+  ParallelBICGSTABTask<N, T>::ParallelBICGSTABTask(const int _n, 
+                                                   Vector<T>* const _x, 
+                                                   const SpMatrix<N, T>* const _mat, 
+                                                   const Vector<T>* const _b) : 
     Task(_n),mat(_mat),x(_x), b(_b){
     /*Allocate shared resources*/
 
@@ -60,10 +61,10 @@ namespace CGF{
     vRange = 0;
     mRange = 0;
 
-    n_blocks = new uint[n_threads];
+    n_blocks = new int[n_threads];
 
     timers = new BenchmarkTimer[n_threads];
-    k = new uint[n_threads];
+    k = new int[n_threads];
   }
 
   template<int N, class T>
@@ -101,7 +102,7 @@ namespace CGF{
 #if 1
   template<int N, class T>
   void ParallelBICGSTABTask<N, T>::exportSummary(){
-    /*for(uint i=0;i<n_threads;i++){
+    /*for(int i=0;i<n_threads;i++){
       timers[i].start("device_device_copy");
       timers[i].stop("device_device_copy");
 
@@ -129,27 +130,27 @@ namespace CGF{
     switch(subTask){
     case BICGSTABConfig:
       if(vRange == 0){
-	vRange   = new VectorRange[n_threads];
-	mRange   = new MatrixRange[n_threads];
+        vRange   = new VectorRange[n_threads];
+        mRange   = new MatrixRange[n_threads];
 	
-	mat->computeBlockDistribution(mRange, vRange, n_blocks, n_threads);
+        mat->computeBlockDistribution(mRange, vRange, n_blocks, n_threads);
 
 #if 0	
-	for(uint i=0;i<n_threads;i++){
-	  message("mRange.start = %d, end = %d, range = %d", 
-		  mRange[i].startRow, mRange[i].endRow, mRange[i].range);
+        for(int i=0;i<n_threads;i++){
+          message("mRange.start = %d, end = %d, range = %d", 
+                  mRange[i].startRow, mRange[i].endRow, mRange[i].range);
 	  
-	  message("vRange.start = %d, end = %d, range = %d", 
-		  vRange[i].startBlock, vRange[i].endBlock, mRange[i].range);
-	}
+          message("vRange.start = %d, end = %d, range = %d", 
+                  vRange[i].startBlock, vRange[i].endBlock, mRange[i].range);
+        }
 #endif
       }
 
       /*Create preconditioner*/
-      for(uint i=0;i<mat->getWidth();i++){
-	(*C)[i] = 1.0/sqrt((*mat)[i][i]);
-	(*C2)[i] = sqrt((*mat)[i][i]);
-	cgfassert((*mat)[i][i] > 0);
+      for(int i=0;i<mat->getWidth();i++){
+        (*C)[i] = (T)1.0/Sqrt((*mat)[i][i]);
+        (*C2)[i] = Sqrt((*mat)[i][i]);
+        cgfassert((*mat)[i][i] > 0);
       }
       return;
     case BICGSTABSolve:
@@ -169,115 +170,76 @@ namespace CGF{
       rho1 = 1;
       
       while(k[TID] < 10000){
-	/*res = |R|^2*/
-	Vector<T>::mulp(*scratch1, *r, *r, vRange[TID]);
-	reductions1[TID] = scratch1->sump(vRange[TID]);
-	caller->sync();
+        /*res = |R|^2*/
+        Vector<T>::mulp(*scratch1, *r, *r, vRange[TID]);
+        T res = scratch1->sum(reductions1, caller, vRange);
 	
-	T res = 0;
-	for(uint i=0;i<n_threads;i++){
-	  res += reductions1[i];
-	}
+        if(res < TOL){
+          if(TID == 0){
+            message("Success in %d iterations", k[TID]);
+          }
+          return;
+        }
 	
-	//caller->sync();
+        /*rho0 = rho1*/
+        /*rho1 = r2.r*/
+        rho0 = rho1;
+        Vector<T>::mulp(*scratch2, *r2, *r, vRange[TID]);
+        rho1 = scratch2->sum(reductions2, caller, vRange);
 	
-	if(res < TOL){
-	  if(TID == 0){
-	    message("Success in %d iterations", k[TID]);
-	  }
-	  return;
-	}
+        /*beta = (rho1/rho0)*(alpha/w0)*/
+        beta = (rho1/rho0)*(alpha/w0);
 	
-	/*rho0 = rho1*/
-	/*rho1 = r2.r*/
-	rho0 = rho1;
-	Vector<T>::mulp(*scratch2, *r2, *r, vRange[TID]);
-	reductions2[TID] = scratch2->sump(vRange[TID]);
-	caller->sync();
+        /*p = r + p -beta * w0 * v*/
+        Vector<T>::mfaddp(*scratch1, -w0, *v, *p, vRange[TID]);
+        Vector<T>::mulfp(*scratch1, *scratch1, beta, vRange[TID]);
+        Vector<T>::addp(*p, *r, *scratch1, vRange[TID]);
 	
-	rho1 = 0;
-	for(uint i=0;i<n_threads;i++){
-	  rho1 += reductions2[i];
-	}
+        Vector<T>::mulp(*pp, *C, *p, vRange[TID]);
 	
-	//caller->sync();
+        /*pp must be completely computed*/
+        caller->sync();
 	
-	/*beta = (rho1/rho0)*(alpha/w0)*/
-	beta = (rho1/rho0)*(alpha/w0);
+        spmv_partial(*v, *mat, *pp, mRange[TID]);      
 	
-	/*p = r + p -beta * w0 * v*/
-	Vector<T>::mfaddp(*scratch1, -w0, *v, *p, vRange[TID]);
-	Vector<T>::mulfp(*scratch1, *scratch1, beta, vRange[TID]);
-	Vector<T>::addp(*p, *r, *scratch1, vRange[TID]);
+        Vector<T>::mulp(*scratch1, *r2, *v, vRange[TID]);
 	
-	Vector<T>::mulp(*pp, *C, *p, vRange[TID]);
+        reductions1[TID] = scratch1->sump(vRange[TID]);
+        T divider = scratch1->sum(reductions1, caller, vRange);
 	
-	/*pp must be completely computed*/
-	caller->sync();
+        alpha = rho1/divider;
 	
-	spmv_partial(*v, *mat, *pp, mRange[TID]);      
+        Vector<T>::mfaddp(*s, -alpha, *v, *r, vRange[TID]);
+        Vector<T>::mulp(*sp, *C, *s, vRange[TID]);
 	
-	Vector<T>::mulp(*scratch1, *r2, *v, vRange[TID]);
+        /*sp must be completely computed*/
+        caller->sync();
 	
-	reductions1[TID] = scratch1->sump(vRange[TID]);
-	caller->sync();
+        spmv_partial(*t, *mat, *sp, mRange[TID]);
 	
-	T divider = 0;
-	for(uint i=0;i<n_threads;i++){
-	  divider += reductions1[i];
-	}
+        Vector<T>::mulp(*scratch1, *C2, *t, vRange[TID]);
+        Vector<T>::mulp(*scratch2, *C2, *s, vRange[TID]);
 	
-	//caller->sync();
+        Vector<T>::mulp(*scratch1, *scratch1, *scratch2, vRange[TID]);
 	
-	alpha = rho1/divider;
+        w0 = scratch1->sum(reductions1, caller, vRange);
 	
-	Vector<T>::mfaddp(*s, -alpha, *v, *r, vRange[TID]);
-	Vector<T>::mulp(*sp, *C, *s, vRange[TID]);
-	
-	/*sp must be completely computed*/
-	caller->sync();
-	
-	spmv_partial(*t, *mat, *sp, mRange[TID]);
-	
-	Vector<T>::mulp(*scratch1, *C2, *t, vRange[TID]);
-	Vector<T>::mulp(*scratch2, *C2, *s, vRange[TID]);
-	
-	Vector<T>::mulp(*scratch1, *scratch1, *scratch2, vRange[TID]);
-	
-	reductions1[TID] = scratch1->sump(vRange[TID]);
-	caller->sync();
-	
-	w0 = 0;
-	for(uint i=0;i<n_threads;i++){
-	  w0 += reductions1[i];
-	}
-	
-	//caller->sync();
-	
-	Vector<T>::mulp(*scratch2, *C2, *t, vRange[TID]);
-	Vector<T>::mulp(*scratch2, *scratch2, *scratch2, vRange[TID]);
-	
-	reductions2[TID] = scratch2->sump(vRange[TID]);
-	caller->sync();
-	
-	divider = 0;
-	for(uint i=0;i<n_threads;i++){
-	  divider += reductions2[i];
-	}
+        Vector<T>::mulp(*scratch2, *C2, *t, vRange[TID]);
+        Vector<T>::mulp(*scratch2, *scratch2, *scratch2, vRange[TID]);
 
-	//caller->sync();
+        divider = scratch2->sum(reductions2, caller, vRange);
 	
-	w0/=divider;
+        w0/=divider;
 	
-	Vector<T>::mulfp(*scratch1, *pp, alpha, vRange[TID]);
-	Vector<T>::mulfp(*scratch2, *sp, w0, vRange[TID]);
-	Vector<T>::addp(*x, *x, *scratch1, vRange[TID]);
-	Vector<T>::addp(*x, *x, *scratch2, vRange[TID]);
+        Vector<T>::mulfp(*scratch1, *pp, alpha, vRange[TID]);
+        Vector<T>::mulfp(*scratch2, *sp, w0, vRange[TID]);
+        Vector<T>::addp(*x, *x, *scratch1, vRange[TID]);
+        Vector<T>::addp(*x, *x, *scratch2, vRange[TID]);
 	
-	Vector<T>::mfaddp(*r, -w0, *t, *s, vRange[TID]);
+        Vector<T>::mfaddp(*r, -w0, *t, *s, vRange[TID]);
 	
-	k[TID]++;
-	//caller->sync();
+        k[TID]++;
+        //caller->sync();
       }
       throw new SolutionNotFoundException(__LINE__, __FILE__);
       return;
