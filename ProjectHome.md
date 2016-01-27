@@ -1,0 +1,1 @@
+PaLinSo provides methods for solving large-sparse linear problems in parallel using multiple cores or GPUs.
